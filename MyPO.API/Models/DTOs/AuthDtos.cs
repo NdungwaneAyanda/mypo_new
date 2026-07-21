@@ -60,7 +60,7 @@ public class ProfileDto
 
 public class UpdateProfileDto
 {
-    public string? CompanyName { get; set; }
-    public string? ContactName { get; set; }
-    public string? Phone { get; set; }
+    [MaxLength(200)] public string? CompanyName { get; set; }
+    [MaxLength(200)] public string? ContactName { get; set; }
+    [MaxLength(20)]  public string? Phone { get; set; }
 }

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace MyPO.API.Models.DTOs;
 
 public class AdminStatsDto
@@ -55,13 +57,13 @@ public class AdminFunderDto
 
 public class SetRoleDto
 {
-    public string Role   { get; set; } = string.Empty;
-    public string Action { get; set; } = "add"; // "add" | "remove"
+    [Required] public string Role   { get; set; } = string.Empty;
+    [Required] public string Action { get; set; } = "add"; // "add" | "remove"
 }
 
 public class SetStatusDto
 {
-    public string Status { get; set; } = string.Empty;
+    [Required] public string Status { get; set; } = string.Empty;
 }
 
 public class SetActiveDto

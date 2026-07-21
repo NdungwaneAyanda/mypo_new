@@ -1,5 +1,8 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MyPO.API.Data;
@@ -72,16 +75,39 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(
-            builder.Configuration["FrontendUrl"] ?? "http://localhost:4200",
-            "http://localhost:4200",
-            "https://localhost:4200"
-        )
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials();
+        var allowedOrigins = new List<string>
+        {
+            builder.Configuration["FrontendUrl"] ?? "http://localhost:4200"
+        };
+
+        // Only allow localhost in development
+        if (builder.Environment.IsDevelopment())
+        {
+            allowedOrigins.Add("http://localhost:4200");
+            allowedOrigins.Add("https://localhost:4200");
+        }
+
+        policy.WithOrigins(allowedOrigins.Distinct().ToArray())
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
+
+// Rate limiting — 10 requests per minute per IP on auth endpoints
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("auth", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
+builder.Services.AddHealthChecks();
 
 builder.Services.AddSignalR();
 
@@ -93,6 +119,25 @@ builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 
 var app = builder.Build();
+
+// Global exception handler — returns structured JSON on unhandled errors
+app.UseExceptionHandler(appBuilder =>
+{
+    appBuilder.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+        var error = context.Features.Get<IExceptionHandlerFeature>();
+        if (error != null)
+            Log.Error(error.Error, "Unhandled exception on {Method} {Path}",
+                context.Request.Method, context.Request.Path);
+        await context.Response.WriteAsJsonAsync(new { message = "An unexpected error occurred." });
+    });
+});
+
+// Redirect HTTP to HTTPS in production
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -109,7 +154,6 @@ using (var scope = app.Services.CreateScope())
 
     if (existingAdmin == null)
     {
-        // Create fresh admin account
         var adminUser = new MyPO.API.Models.Entities.User
         {
             Email          = adminEmail,
@@ -123,7 +167,6 @@ using (var scope = app.Services.CreateScope())
     }
     else
     {
-        // Always sync email + password hash so appsettings.json is the source of truth
         existingAdmin.Email        = adminEmail;
         existingAdmin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
         db.SaveChanges();
@@ -141,12 +184,14 @@ app.UseSerilogRequestLogging(opts =>
                                                        LogEventLevel.Information;
 });
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapHub<NotificationHub>("/hubs/notifications");
+app.MapHealthChecks("/health");
 
 app.Run();
 

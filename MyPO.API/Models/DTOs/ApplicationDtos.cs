@@ -4,17 +4,17 @@ namespace MyPO.API.Models.DTOs;
 
 public class CreateApplicationDto
 {
-    [Required] public string CompanyName { get; set; } = string.Empty;
-    [Required] public string ContactName { get; set; } = string.Empty;
-    [Required, EmailAddress] public string Email { get; set; } = string.Empty;
-    [Required] public string Phone { get; set; } = string.Empty;
-    [Required] public string Industry { get; set; } = string.Empty;
-    [Required] public decimal PoAmount { get; set; }
-    [Required] public decimal CostOfDelivery { get; set; }
-    [Required] public decimal AmountNeeded { get; set; }
-    [Required] public string CustomerName { get; set; } = string.Empty;
-    [Required] public string PaymentTerms { get; set; } = string.Empty;
-    public string? Description { get; set; }
+    [Required, MaxLength(200)] public string CompanyName { get; set; } = string.Empty;
+    [Required, MaxLength(200)] public string ContactName { get; set; } = string.Empty;
+    [Required, EmailAddress, MaxLength(254)] public string Email { get; set; } = string.Empty;
+    [Required, MaxLength(20)] public string Phone { get; set; } = string.Empty;
+    [Required, MaxLength(100)] public string Industry { get; set; } = string.Empty;
+    [Required, Range(0.01, 100_000_000)] public decimal PoAmount { get; set; }
+    [Required, Range(0.01, 100_000_000)] public decimal CostOfDelivery { get; set; }
+    [Required, Range(0.01, 100_000_000)] public decimal AmountNeeded { get; set; }
+    [Required, MaxLength(200)] public string CustomerName { get; set; } = string.Empty;
+    [Required, MaxLength(100)] public string PaymentTerms { get; set; } = string.Empty;
+    [MaxLength(2000)] public string? Description { get; set; }
 }
 
 public class ApplicationResponseDto
@@ -52,12 +52,12 @@ public class DocumentResponseDto
 
 public class ClaimApplicationDto
 {
-    public string Action { get; set; } = string.Empty; // "claim" or "take"
+    [Required] public string Action { get; set; } = string.Empty; // "review" or "take"
 }
 
 public class MessageDto
 {
-    [Required] public string MessageText { get; set; } = string.Empty;
+    [Required, MaxLength(5000)] public string MessageText { get; set; } = string.Empty;
 }
 
 public class MessageResponseDto
