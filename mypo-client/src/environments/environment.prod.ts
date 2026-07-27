@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: '/api',
-  hubUrl: '/hubs'
+  apiUrl: 'https://api.mypo.co.za/api',
+  hubUrl: 'https://api.mypo.co.za/hubs'
 };

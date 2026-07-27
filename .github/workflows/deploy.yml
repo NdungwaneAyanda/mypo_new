@@ -1,0 +1,126 @@
+name: Deploy
+
+# Single workflow for both projects. Each job only runs when files in its
+# folder change (or via manual dispatch), so the API and frontend deploy
+# independently of each other. See CICD.md for full setup instructions.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_api:
+        description: "Force-deploy the API regardless of changed files"
+        type: boolean
+        default: false
+      deploy_web:
+        description: "Force-deploy the frontend regardless of changed files"
+        type: boolean
+        default: false
+
+concurrency:
+  group: mypo-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  API_REMOTE_PATH: /var/www/mypo-api
+  WEB_REMOTE_PATH: /var/www/mypo-web
+
+jobs:
+  changes:
+    name: Detect changed projects
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'MyPO.API/**'
+            web:
+              - 'mypo-client/**'
+
+  deploy-api:
+    name: Build & deploy MyPO.API
+    needs: changes
+    if: needs.changes.outputs.api == 'true' || github.event.inputs.deploy_api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish
+        run: dotnet publish MyPO.API/MyPO.API.csproj -c Release -o ./publish
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.SSH_PORT || 22 }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Rsync build to server
+        run: |
+          rsync -az --delete \
+            --exclude 'appsettings.json' \
+            --exclude 'appsettings.example.json' \
+            --exclude 'keys/' \
+            --exclude 'wwwroot/' \
+            --exclude 'logs/' \
+            -e "ssh -p ${{ secrets.SSH_PORT || 22 }}" \
+            ./publish/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.API_REMOTE_PATH }}/"
+
+      - name: Restart API service
+        run: |
+          ssh -p "${{ secrets.SSH_PORT || 22 }}" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "sudo systemctl restart mypo-api && sudo systemctl is-active mypo-api"
+
+  deploy-web:
+    name: Build & deploy mypo-client
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event.inputs.deploy_web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mypo-client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mypo-client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production)
+        run: npm run build
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.SSH_PORT || 22 }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Rsync build to server
+        run: |
+          rsync -az --delete \
+            -e "ssh -p ${{ secrets.SSH_PORT || 22 }}" \
+            ./dist/mypo-client/browser/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.WEB_REMOTE_PATH }}/"

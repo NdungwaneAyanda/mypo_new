@@ -73,7 +73,9 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(
-            builder.Configuration["FrontendUrl"] ?? "http://localhost:4200",
+            builder.Configuration["FrontendUrl"] ?? "https://mypo.co.za",
+            "https://mypo.co.za",
+            "https://www.mypo.co.za",
             "http://localhost:4200",
             "https://localhost:4200"
         )
@@ -82,6 +84,17 @@ builder.Services.AddCors(options =>
         .AllowCredentials();
     });
 });
+
+// Persist Data Protection keys to disk when a directory is configured
+// (e.g. on Linux where the service account has no user profile).
+var dataProtectionKeysDir = builder.Configuration["DataProtection:KeysDirectory"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysDir))
+{
+    Directory.CreateDirectory(dataProtectionKeysDir);
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir))
+        .SetApplicationName("MyPO.API");
+}
 
 builder.Services.AddSignalR();
 

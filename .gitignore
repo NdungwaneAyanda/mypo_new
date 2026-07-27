@@ -1,0 +1,37 @@
+# ---------------------------------------------
+# Secrets / environment-specific config
+# ---------------------------------------------
+# Contains DB credentials, JWT key, API keys and admin password.
+# Keep these OUT of source control. Use appsettings.example.json as the template.
+MyPO.API/appsettings.json
+**/appsettings.*.local.json
+
+# ---------------------------------------------
+# .NET build output
+# ---------------------------------------------
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Publish output
+publish/
+[Pp]ublish/
+*.publishsettings
+
+# ---------------------------------------------
+# Logs
+# ---------------------------------------------
+logs/
+*.log
+
+# ---------------------------------------------
+# OS / editor files
+# ---------------------------------------------
+.DS_Store
+Thumbs.db
+.vs/
