@@ -175,8 +175,21 @@ This uses [`dorny/paths-filter`](https://github.com/dorny/paths-filter) to compa
 
 ## Troubleshooting
 
-**Workflow fails at "Trust host key" / `ssh-keyscan`:**
-Check `SSH_HOST` is reachable on port 22 (or your `SSH_PORT`) from the internet — GitHub-hosted runners connect from GitHub's IP ranges, not your machine.
+**Workflow fails at "Trust host key" / `ssh-keyscan` (exit code 1, no useful detail):**
+
+This step now prints the underlying `ssh-keyscan` error and fails fast after 10s instead of hanging — re-run the job and check the new log output. The two most common causes:
+
+1. **Wrong `SSH_HOST` / `SSH_PORT` secret** — no protocol prefix (`https://`), no trailing slash, no quotes. Just the bare IP or hostname, e.g. `20.164.22.95`.
+2. **Firewall / NSG blocking GitHub-hosted runners.** GitHub-hosted runners connect from constantly-changing IP ranges (published at [`api.github.com/meta`](https://api.github.com/meta)), not a fixed IP. If your server is on **Azure** (VM name like `...ASPNETVM` is a giveaway) and you've locked SSH down to specific source IPs in the VM's **Network Security Group (NSG)**, GitHub Actions will be blocked before it ever reaches `sshd` — `ssh-keyscan` will time out with no response.
+
+   Check in the Azure Portal: **VM → Networking → Network settings → NSG inbound rules** (or the NSG resource directly) for a rule on port 22 (or your custom SSH port). If the **Source** is restricted to a specific IP/range instead of `Any`/`Internet`, that's the blocker.
+
+   Options, in order of preference:
+   - **Self-hosted runner** on the same server/network — avoids exposing SSH to the internet at all. (More setup, most secure.)
+   - **Allow GitHub's published IP ranges** in the NSG rule (fetch the `actions` block from `https://api.github.com/meta`) — these change periodically, so this needs occasional maintenance.
+   - **Temporarily open the NSG rule to `Any`** for SSH while relying on key-only auth (no password auth) plus fail2ban — simplest, slightly less defense-in-depth since it's public exposure (mitigated by disabling password auth entirely).
+
+   Also double check `ufw` on the VM itself isn't separately restricting by source IP (`sudo ufw status verbose`) — Azure NSG and `ufw` are independent layers and both need to allow the connection.
 
 **`Permission denied (publickey)`:**
 - Confirm the public key is in `/home/deploy/.ssh/authorized_keys` on the server.
