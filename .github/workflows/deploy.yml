@@ -80,7 +80,7 @@ jobs:
 
       - name: Rsync build to server
         run: |
-          rsync -rtvz --delete --no-owner --no-group \
+          rsync -rtvz --delete --no-owner --no-group --omit-dir-times \
             --exclude 'appsettings.json' \
             --exclude 'appsettings.example.json' \
             --exclude 'keys/' \
@@ -138,6 +138,6 @@ jobs:
 
       - name: Rsync build to server
         run: |
-          rsync -rtvz --delete --no-owner --no-group \
+          rsync -rtvz --delete --no-owner --no-group --omit-dir-times \
             -e "ssh -p ${{ secrets.SSH_PORT || 22 }}" \
             ./dist/mypo-client/browser/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.WEB_REMOTE_PATH }}/"
