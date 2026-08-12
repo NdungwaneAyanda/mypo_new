@@ -87,10 +87,11 @@ import { environment } from '../../../environments/environment';
           <div class="info-body">
             <strong>Office</strong>
             <span class="info-addr">
-              MyPO (Pty) Ltd<br>
-              Woodlands Office Park – Building 16 – 2nd Floor<br>
-              20 Woodlands Drive, Woodmead<br>
-              Johannesburg, 2191<br>
+              Country Club Estate<br>
+              Building 2, Woodlands Drive<br>
+              Woodmead<br>
+              Johannesburg<br>
+              2052<br>
               South Africa
             </span>
           </div>

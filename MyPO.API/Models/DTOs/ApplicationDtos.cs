@@ -35,6 +35,7 @@ public class ApplicationResponseDto
     public string Status { get; set; } = string.Empty;
     public string? RefCode { get; set; }
     public Guid? AssignedFunderId { get; set; }
+    public Guid? AssignedFunderUserId { get; set; }
     public string? AssignedFunderCompany { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

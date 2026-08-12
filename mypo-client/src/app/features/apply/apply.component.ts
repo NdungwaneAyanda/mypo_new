@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -96,9 +96,32 @@ interface DocFile { type: string; label: string; file: File | null; }
                   <input class="form-control" type="text" [(ngModel)]="form.amountStr" name="amount" required placeholder="40,000" (blur)="formatAmt('amount')" />
                 </div>
               </div>
-              <div class="form-group">
-                <label class="form-label">Customer Name *</label>
-                <input class="form-control" [(ngModel)]="form.customerName" name="customerName" required placeholder="Who issued the PO" />
+              <div class="form-group ac-wrap">
+                <label class="form-label">Customer (PO Issuer) *</label>
+                <div class="ac-field">
+                  <input class="form-control" autocomplete="off"
+                         [value]="form.customerName"
+                         (input)="onAcInput($event)"
+                         (focus)="onAcFocus()"
+                         (keydown)="onAcKey($event)"
+                         placeholder="Type to search government entities…"
+                         name="customerName" required />
+                  @if (form.customerName) {
+                    <button type="button" class="ac-clear" (click)="clearCustomer()" title="Clear">✕</button>
+                  }
+                </div>
+                @if (acOpen() && acResults().length) {
+                  <ul class="ac-list">
+                    @for (r of acResults(); track r; let i = $index) {
+                      <li class="ac-item" [class.ac-active]="i === acIndex()"
+                          (mousedown)="selectCustomer(r)"
+                          (mouseover)="acIndex.set(i)">
+                        <span [innerHTML]="highlight(r)"></span>
+                      </li>
+                    }
+                  </ul>
+                }
+                <p class="ac-hint">Can't find your entity? Just type the full name above.</p>
               </div>
               <div class="form-group">
                 <label class="form-label">Payment Terms *</label>
@@ -238,6 +261,36 @@ interface DocFile { type: string; label: string; file: File | null; }
     .success-card p  { color: var(--gray-500); line-height: 1.7; margin-bottom: 1.75rem; }
     .success-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
 
+    /* ── Autocomplete ── */
+    .ac-wrap { position: relative; }
+    .ac-field { position: relative; display: flex; align-items: center; }
+    .ac-field .form-control { padding-right: 2rem; }
+    .ac-clear {
+      position: absolute; right: .625rem;
+      background: none; border: none; cursor: pointer;
+      color: var(--muted, #65758b); font-size: .8rem; line-height: 1;
+      padding: .25rem; border-radius: 50%; transition: color .15s;
+    }
+    .ac-clear:hover { color: #ef4444; }
+    .ac-list {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: #fff; border: 1.5px solid var(--border, #c6cdd8);
+      border-radius: .625rem; box-shadow: 0 8px 24px rgba(0,0,0,.10);
+      max-height: 280px; overflow-y: auto; z-index: 999;
+      margin: 0; padding: .375rem 0; list-style: none;
+    }
+    .ac-item {
+      padding: .5rem .875rem; font-size: .9rem; cursor: pointer;
+      color: var(--foreground, #111e33); transition: background .12s;
+      line-height: 1.45;
+    }
+    .ac-item:hover, .ac-item.ac-active { background: var(--bg-2, #f1f4f7); }
+    .ac-item mark {
+      background: rgba(22,162,134,.18); color: var(--teal, #16a286);
+      font-weight: 700; border-radius: 2px; padding: 0 1px;
+    }
+    .ac-hint { font-size: .78rem; color: var(--muted, #65758b); margin-top: .375rem; }
+
     @media (max-width: 640px) {
       .field-grid { grid-template-columns: 1fr; }
       .docs-grid  { grid-template-columns: 1fr; }
@@ -260,6 +313,371 @@ export class ApplyComponent {
 
   industries = ['Construction','Manufacturing','Mining','Agriculture','Retail','Technology','Healthcare','Logistics','Energy','Government','Other'];
 
+  /* ── Full SA government tender-issuing entity list ── */
+  readonly allEntities: string[] = [
+    // National Departments
+    'Department of Basic Education',
+    'Department of Communications and Digital Technologies',
+    'Department of Cooperative Governance and Traditional Affairs (CoGTA)',
+    'Department of Correctional Services',
+    'Department of Defence',
+    'Department of Employment and Labour',
+    'Department of Environment, Forestry and Fisheries',
+    'Department of Finance',
+    'Department of Health',
+    'Department of Higher Education and Training',
+    'Department of Home Affairs',
+    'Department of Human Settlements',
+    'Department of International Relations and Cooperation (DIRCO)',
+    'Department of Justice and Constitutional Development',
+    'Department of Land Reform and Rural Development',
+    'Department of Military Veterans',
+    'Department of Mineral Resources and Energy',
+    'Department of Police (SAPS)',
+    'Department of Public Enterprises',
+    'Department of Public Service and Administration',
+    'Department of Public Works and Infrastructure',
+    'Department of Small Business Development',
+    'Department of Social Development',
+    'Department of Sport, Arts and Culture',
+    'Department of Tourism',
+    'Department of Trade, Industry and Competition (DTIC)',
+    'Department of Transport',
+    'Department of Water and Sanitation',
+    'Department of Women, Youth and Persons with Disabilities',
+    'National Treasury',
+    'The Presidency',
+    // State-Owned Enterprises
+    'Eskom Holdings SOC Ltd',
+    'Transnet SOC Ltd',
+    'South African National Roads Agency (SANRAL)',
+    'South African Broadcasting Corporation (SABC)',
+    'South African Post Office (SAPO)',
+    'Airports Company South Africa (ACSA)',
+    'South African Airways (SAA)',
+    'Industrial Development Corporation (IDC)',
+    'Development Bank of Southern Africa (DBSA)',
+    'Land and Agricultural Development Bank (Land Bank)',
+    'South African Revenue Service (SARS)',
+    'Government Employees Pension Fund (GEPF)',
+    'Public Investment Corporation (PIC)',
+    'Passenger Rail Agency of South Africa (PRASA)',
+    'Armscor',
+    'Denel SOC Ltd',
+    'State Information Technology Agency (SITA)',
+    'Independent Communications Authority of SA (ICASA)',
+    'South African Nuclear Energy Corporation (NECSA)',
+    'Central Energy Fund (CEF)',
+    'South African Forestry Company (SAFCOL)',
+    'Rand Water',
+    'Umgeni Water',
+    'Lepelle Northern Water',
+    'Magalies Water',
+    'Mhlathuze Water',
+    'Overberg Water',
+    'Sedibeng Water',
+    'Bloem Water',
+    'Amatola Water',
+    'Ikangala Water Board',
+    'Pelladrift Water Board',
+    'South African Bureau of Standards (SABS)',
+    'Government Printing Works',
+    'South African Express Airways',
+    'Air Traffic and Navigation Services (ATNS)',
+    'South African Tourism',
+    'Brand South Africa',
+    // Constitutional Institutions
+    'Independent Electoral Commission (IEC)',
+    'South African Human Rights Commission (SAHRC)',
+    'Office of the Public Protector',
+    'National Prosecuting Authority (NPA)',
+    'Financial Intelligence Centre (FIC)',
+    'Auditor-General of South Africa (AGSA)',
+    'South African Reserve Bank (SARB)',
+    'Financial Sector Conduct Authority (FSCA)',
+    'Prudential Authority',
+    // Chapter 9 & Regulators
+    'Competition Commission of South Africa',
+    'Competition Tribunal',
+    'National Regulator for Compulsory Specifications (NRCS)',
+    'South African Health Products Regulatory Authority (SAHPRA)',
+    'National Energy Regulator of SA (NERSA)',
+    'National Consumer Commission (NCC)',
+    'Companies and Intellectual Property Commission (CIPC)',
+    'National Lotteries Commission (NLC)',
+    'National Credit Regulator (NCR)',
+    'South African Civil Aviation Authority (SACAA)',
+    'South African Maritime Safety Authority (SAMSA)',
+    // Research & Science
+    'Council for Scientific and Industrial Research (CSIR)',
+    'National Research Foundation (NRF)',
+    'Human Sciences Research Council (HSRC)',
+    'Agricultural Research Council (ARC)',
+    'Medical Research Council (SAMRC)',
+    'Council for Geoscience',
+    'South African National Space Agency (SANSA)',
+    'Technology Innovation Agency (TIA)',
+    'National Advisory Council on Innovation (NACI)',
+    // Health Entities
+    'National Health Laboratory Service (NHLS)',
+    'Office of Health Standards Compliance (OHSC)',
+    'South African National Blood Service (SANBS)',
+    // Education & Training
+    'South African Qualifications Authority (SAQA)',
+    'Quality Council for Trades and Occupations (QCTO)',
+    'Umalusi',
+    'National Student Financial Aid Scheme (NSFAS)',
+    // Universities & TVET
+    'University of South Africa (UNISA)',
+    'University of the Witwatersrand',
+    'University of Cape Town (UCT)',
+    'University of KwaZulu-Natal (UKZN)',
+    'University of Pretoria (UP)',
+    'Stellenbosch University',
+    'University of Johannesburg (UJ)',
+    'University of the Free State',
+    'University of the Western Cape (UWC)',
+    'University of Limpopo',
+    'University of Zululand',
+    'Walter Sisulu University',
+    'Rhodes University',
+    'North-West University (NWU)',
+    'Nelson Mandela University',
+    'Cape Peninsula University of Technology (CPUT)',
+    'Tshwane University of Technology (TUT)',
+    'Durban University of Technology (DUT)',
+    'Central University of Technology (CUT)',
+    'Mangosuthu University of Technology (MUT)',
+    'Vaal University of Technology (VUT)',
+    'Sol Plaatje University',
+    'University of Mpumalanga',
+    'Sefako Makgatho Health Sciences University (SMU)',
+    // SETA & Skills
+    'Energy and Water Sector Education and Training Authority (EWSETA)',
+    'Construction Education and Training Authority (CETA)',
+    'Manufacturing, Engineering and Related Services SETA (merSETA)',
+    'Health and Welfare Sector Education and Training Authority (HWSETA)',
+    'Education, Training and Development Practices SETA (ETDP SETA)',
+    'Public Service SETA (PSETA)',
+    'Transport Education and Training Authority (TETA)',
+    'Mining Qualifications Authority (MQA)',
+    'AgriSETA',
+    'BankSETA',
+    'Fibre Processing and Manufacturing SETA (FP&M SETA)',
+    'Food and Beverages Manufacturing Industry SETA (FoodBev SETA)',
+    'Financial and Accounting Services SETA (FASSET)',
+    'Insurance SETA (INSETA)',
+    'Local Government SETA (LGSETA)',
+    'Media, Information and Communication Technologies SETA (MICT SETA)',
+    'Safety and Security SETA (SASSETA)',
+    'Services SETA',
+    'Wholesale and Retail SETA (W&R SETA)',
+    // Provincial Governments
+    'Gauteng Department of Health',
+    'Gauteng Department of Education',
+    'Gauteng Department of Infrastructure Development',
+    'Gauteng Department of Agriculture and Rural Development',
+    'Gauteng Department of Social Development',
+    'Gauteng Department of Economic Development',
+    'Gauteng Department of Community Safety',
+    'Western Cape Department of Health',
+    'Western Cape Department of Education',
+    'Western Cape Department of Public Works',
+    'Western Cape Department of Social Development',
+    'Western Cape Department of Agriculture',
+    'KwaZulu-Natal Department of Health',
+    'KwaZulu-Natal Department of Education',
+    'KwaZulu-Natal Department of Public Works',
+    'KwaZulu-Natal Department of Social Development',
+    'KwaZulu-Natal Department of Agriculture',
+    'Eastern Cape Department of Health',
+    'Eastern Cape Department of Education',
+    'Eastern Cape Department of Roads and Public Works',
+    'Eastern Cape Department of Social Development',
+    'Limpopo Department of Health',
+    'Limpopo Department of Education',
+    'Limpopo Department of Public Works',
+    'Limpopo Department of Social Development',
+    'Mpumalanga Department of Health',
+    'Mpumalanga Department of Education',
+    'Mpumalanga Department of Public Works',
+    'North West Department of Health',
+    'North West Department of Education',
+    'North West Department of Public Works',
+    'Free State Department of Health',
+    'Free State Department of Education',
+    'Free State Department of Public Works',
+    'Northern Cape Department of Health',
+    'Northern Cape Department of Education',
+    'Northern Cape Department of Public Works',
+    // Metros
+    'City of Johannesburg Metropolitan Municipality',
+    'City of Cape Town Metropolitan Municipality',
+    'eThekwini Metropolitan Municipality',
+    'Ekurhuleni Metropolitan Municipality',
+    'City of Tshwane Metropolitan Municipality',
+    'Buffalo City Metropolitan Municipality',
+    'Mangaung Metropolitan Municipality',
+    'Nelson Mandela Bay Metropolitan Municipality',
+    // Major Local Municipalities
+    'City of Matlosana Local Municipality',
+    'Emalahleni Local Municipality',
+    'Steve Tshwete Local Municipality',
+    'Rustenburg Local Municipality',
+    'Drakenstein Local Municipality',
+    'Stellenbosch Local Municipality',
+    'George Local Municipality',
+    'Msunduzi Local Municipality (Pietermaritzburg)',
+    'Newcastle Local Municipality',
+    'Emnambithi/Ladysmith Local Municipality',
+    'Sol Plaatje Local Municipality (Kimberley)',
+    'Moqhaka Local Municipality',
+    'Matjhabeng Local Municipality',
+    'Polokwane Local Municipality',
+    'Thulamela Local Municipality',
+    'Greater Tzaneen Local Municipality',
+    'Lephalale Local Municipality',
+    'Mkhondo Local Municipality',
+    'Emakhazeni Local Municipality',
+    'Gert Sibande District Municipality',
+    'Nkangala District Municipality',
+    'Ehlanzeni District Municipality',
+    'Waterberg District Municipality',
+    'Capricorn District Municipality',
+    'Vhembe District Municipality',
+    'Mopani District Municipality',
+    'Sekhukhune District Municipality',
+    'uThukela District Municipality',
+    'iLembe District Municipality',
+    'Ugu District Municipality',
+    'uMgungundlovu District Municipality',
+    'uMzinyathi District Municipality',
+    'Alfred Nzo District Municipality',
+    'Amathole District Municipality',
+    'Chris Hani District Municipality',
+    'Joe Gqabi District Municipality',
+    'OR Tambo District Municipality',
+    'Sarah Baartman District Municipality',
+    'Bojanala Platinum District Municipality',
+    'Dr Kenneth Kaunda District Municipality',
+    'Ngaka Modiri Molema District Municipality',
+    'Dr Ruth Segomotsi Mompati District Municipality',
+    'Fezile Dabi District Municipality',
+    'Lejweleputswa District Municipality',
+    'Thabo Mofutsanyana District Municipality',
+    'Xhariep District Municipality',
+    'John Taolo Gaetsewe District Municipality',
+    'Namakwa District Municipality',
+    'Pixley ka Seme District Municipality',
+    'ZF Mgcawu District Municipality',
+    'ZF Mgcawu District Municipality',
+    'Frances Baard District Municipality',
+    'Cape Winelands District Municipality',
+    'Central Karoo District Municipality',
+    'Garden Route District Municipality',
+    'Overberg District Municipality',
+    'West Coast District Municipality',
+    'City Region District Municipality',
+    // Other
+    'South African Local Government Association (SALGA)',
+    'Municipal Infrastructure Support Agent (MISA)',
+    'South African National Biodiversity Institute (SANBI)',
+    'South African Weather Service (SAWS)',
+    'South African Institute of Chartered Accountants (SAICA)',
+    'National Housing Finance Corporation (NHFC)',
+    'Housing Development Agency (HDA)',
+    'Social Housing Regulatory Authority (SHRA)',
+    'Community Schemes Ombud Service (CSOS)',
+    'Property Management Trading Entity (PMTE)',
+    'Compensation Fund',
+    'Unemployment Insurance Fund (UIF)',
+    'Road Accident Fund (RAF)',
+    'Passenger Rail Agency of South Africa (PRASA)',
+    'Cross-Border Road Transport Agency (CBRTA)',
+    'Railway Safety Regulator (RSR)',
+    'Ports Regulator of South Africa',
+    'South African National Parks (SANParks)',
+    'iSimangaliso Wetland Park Authority',
+    'Isimangaliso Wetland Park',
+    'South African Heritage Resources Agency (SAHRA)',
+    'National Film and Video Foundation (NFVF)',
+    'Blind SA',
+    'National Arts Council (NAC)',
+    'National Heritage Council (NHC)',
+    'South African Library for the Blind',
+    'Pan South African Language Board (PanSALB)',
+    'South African Sports Confederation and Olympic Committee (SASCOC)',
+    'Boxing South Africa',
+  ].sort((a, b) => a.localeCompare(b));
+
+  /* ── Autocomplete state ── */
+  acOpen  = signal(false);
+  acIndex = signal(-1);
+  acQuery = '';
+  acResults = signal<string[]>([]);
+
+  onAcInput(e: Event) {
+    const q = (e.target as HTMLInputElement).value;
+    this.acQuery = q;
+    this.form.customerName = q;          // allow free-text too
+    this.acIndex.set(-1);
+    if (q.trim().length < 1) { this.acResults.set([]); this.acOpen.set(false); return; }
+    const lower = q.toLowerCase();
+    const results = this.allEntities
+      .filter(en => en.toLowerCase().includes(lower))
+      .slice(0, 12);
+    this.acResults.set(results);
+    this.acOpen.set(results.length > 0);
+  }
+
+  onAcFocus() {
+    if (this.acResults().length) this.acOpen.set(true);
+  }
+
+  onAcKey(e: KeyboardEvent) {
+    const list = this.acResults();
+    if (!this.acOpen() || !list.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      this.acIndex.set(Math.min(this.acIndex() + 1, list.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      this.acIndex.set(Math.max(this.acIndex() - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (this.acIndex() >= 0) this.selectCustomer(list[this.acIndex()]);
+    } else if (e.key === 'Escape') {
+      this.acOpen.set(false);
+    }
+  }
+
+  selectCustomer(val: string) {
+    this.form.customerName = val;
+    this.acQuery = val;
+    this.acOpen.set(false);
+    this.acResults.set([]);
+  }
+
+  clearCustomer() {
+    this.form.customerName = '';
+    this.acQuery = '';
+    this.acResults.set([]);
+    this.acOpen.set(false);
+  }
+
+  highlight(text: string): string {
+    if (!this.acQuery.trim()) return text;
+    const escaped = this.acQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocClick(e: MouseEvent) {
+    if (!(e.target as HTMLElement).closest('.ac-wrap')) {
+      this.acOpen.set(false);
+    }
+  }
+
   docFiles: DocFile[] = [
     { type: 'purchase_order',            label: 'Purchase Order',               file: null },
     { type: 'company_registration',      label: 'Company Registration Document', file: null },
@@ -271,7 +689,8 @@ export class ApplyComponent {
 
   constructor(
     private appSvc: ApplicationService, private auth: AuthService,
-    private router: Router, private toast: ToastService
+    private router: Router, private toast: ToastService,
+    private elRef: ElementRef
   ) {
     this.prefillFromUser();
   }
@@ -349,6 +768,7 @@ export class ApplyComponent {
     this.submitted.set(false); this.error.set('');
     this.form = { companyName:'', contactName:'', email:'', phone:'', industry:'', customerName:'', paymentTerms:'', description:'', poAmountStr:'', costStr:'', amountStr:'' };
     this.docFiles.forEach(d => d.file = null);
+    this.clearCustomer();
     this.prefillFromUser();
   }
 }

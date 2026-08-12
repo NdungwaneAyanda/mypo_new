@@ -393,7 +393,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   isMyMessage(msg: MessageDto) { return msg.senderId === this.auth.currentUser()?.id; }
-  isMyClaimedApp(app: ApplicationDto) { return app.assignedFunderId === this.auth.currentUser()?.id; }
+  // assignedFunderUserId is the User.Id of the funder; compare that against the logged-in user's id
+  isMyClaimedApp(app: ApplicationDto) { return app.assignedFunderUserId === this.auth.currentUser()?.id; }
 
   claim(app: ApplicationDto) {
     this.appSvc.claimApplication(app.id, 'claim').subscribe({

@@ -142,16 +142,10 @@ import { LogoComponent } from '../../shared/components/logo.component';
       padding: 0 1.75rem 1.5rem;
       width: 100%;
       box-shadow: 0 20px 60px rgba(0,0,0,.35);
-      /* Login — navy top accent */
-      border-top: 4px solid #1e3a5f;
+      border-top: 4px solid #16a286;
     }
-    /* Register — teal top accent */
-    .auth-card.card-register {
-      border-top-color: #10b981;
-    }
-
-    /* ── Funder card variant ── */
-    .auth-card.card-funder { border-top-color: #7c3aed; }
+    .auth-card.card-register { border-top-color: #16a286; }
+    .auth-card.card-funder   { border-top-color: #16a286; }
 
     /* ── Role toggle (login) ── */
     .role-toggle-wrap { padding: 1.25rem 0 1rem; text-align: center; }
@@ -166,8 +160,8 @@ import { LogoComponent } from '../../shared/components/logo.component';
       cursor: pointer; transition: all .2s; letter-spacing: .01em;
     }
     .role-btn:first-child { border-right: 1.5px solid #e5e7eb; }
-    .role-btn.active-supplier { background: #1e3a5f; color: #fff; }
-    .role-btn.active-funder   { background: #7c3aed; color: #fff; }
+    .role-btn.active-supplier { background: #16a286; color: #fff; }
+    .role-btn.active-funder   { background: #16a286; color: #fff; }
 
     /* ── Mode badge (register) ── */
     .mode-badge {
@@ -207,10 +201,8 @@ import { LogoComponent } from '../../shared/components/logo.component';
       font-size: .9375rem; color: #111827; background: #fff;
       outline: none; transition: border-color .2s, box-shadow .2s;
     }
-    /* Login focus — navy ring */
-    .field-input:focus { border-color: #1e3a5f; box-shadow: 0 0 0 3px rgba(30,58,95,.12); }
-    /* Register focus — teal ring */
-    .field-input.input-register:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.14); }
+    .field-input:focus { border-color: #16a286; box-shadow: 0 0 0 3px rgba(22,162,134,.14); }
+    .field-input.input-register:focus { border-color: #16a286; box-shadow: 0 0 0 3px rgba(22,162,134,.14); }
     .field-input::placeholder { color: #9ca3af; }
 
     .pw-hint { font-size: .78rem; color: #9ca3af; margin-top: .3rem; }
@@ -222,23 +214,20 @@ import { LogoComponent } from '../../shared/components/logo.component';
     }
     .eye-btn:hover { color: #6b7280; }
 
-    /* ── Submit buttons ── */
+    /* ── Submit buttons — all use company teal ── */
     .auth-btn {
       width: 100%; padding: .75rem;
-      background: #1e3a5f; color: #fff;
+      background: linear-gradient(135deg, #16a286 0%, #1ec9a8 100%); color: #fff;
       border: none; border-radius: 8px;
       font-size: .9375rem; font-weight: 700;
       cursor: pointer; margin-top: .375rem;
-      transition: background .2s;
+      transition: opacity .2s;
       display: flex; align-items: center; justify-content: center; gap: .5rem;
+      box-shadow: 0 4px 14px rgba(22,162,134,.35);
     }
-    .auth-btn:hover:not(:disabled) { background: #162d4a; }
-    /* Register — teal button */
-    .auth-btn.btn-register { background: #059669; }
-    .auth-btn.btn-register:hover:not(:disabled) { background: #047857; }
-    /* Funder — purple button */
-    .auth-btn.btn-funder { background: #7c3aed; }
-    .auth-btn.btn-funder:hover:not(:disabled) { background: #6d28d9; }
+    .auth-btn:hover:not(:disabled) { opacity: .88; }
+    .auth-btn.btn-register { background: linear-gradient(135deg, #16a286 0%, #1ec9a8 100%); }
+    .auth-btn.btn-funder   { background: linear-gradient(135deg, #16a286 0%, #1ec9a8 100%); }
     .auth-btn:disabled { opacity: .6; cursor: not-allowed; }
 
     /* Switch link */
@@ -251,8 +240,7 @@ import { LogoComponent } from '../../shared/components/logo.component';
       color: #10b981; font-weight: 600; font-size: .875rem;
       padding: 0;
     }
-    /* Sign in link on register card — navy colour */
-    .switch-link.switch-link-login { color: #1e3a5f; }
+    .switch-link.switch-link-login { color: #16a286; }
     .switch-link:hover { text-decoration: underline; }
 
     /* Spinner */

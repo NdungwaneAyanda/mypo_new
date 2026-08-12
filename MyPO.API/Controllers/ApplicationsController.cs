@@ -301,13 +301,13 @@ public class ApplicationsController : ControllerBase
 
         if (app == null) return NotFound();
 
-        if (app.Status != "pending")
-            return BadRequest(new { message = "Application is not available for claiming." });
-
         if (dto.Action == "take")
         {
+            // Funder can take an offer only after they have already claimed it for review
+            if (app.Status != "reviewed" || app.AssignedFunderId != funder.Id)
+                return BadRequest(new { message = "You must claim and review this application before taking the offer." });
+
             app.Status = "successful";
-            app.AssignedFunderId = funder.Id;
             app.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
             _logger.LogInformation("Application FUNDED: {RefCode} by funder {FunderCompany} (UserId={FunderId})",
@@ -316,6 +316,10 @@ public class ApplicationsController : ControllerBase
         }
         else
         {
+            // Claim — only available on fresh pending applications
+            if (app.Status != "pending")
+                return BadRequest(new { message = "Application is not available for claiming." });
+
             app.Status = "reviewed";
             app.AssignedFunderId = funder.Id;
             app.UpdatedAt = DateTime.UtcNow;
@@ -456,6 +460,7 @@ public class ApplicationsController : ControllerBase
             Status = app.Status,
             RefCode = app.RefCode,
             AssignedFunderId = app.AssignedFunderId,
+            AssignedFunderUserId = app.AssignedFunder?.UserId,
             AssignedFunderCompany = app.AssignedFunder?.CompanyName,
             CreatedAt = app.CreatedAt,
             UpdatedAt = app.UpdatedAt,

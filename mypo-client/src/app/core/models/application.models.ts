@@ -37,6 +37,7 @@ export interface ApplicationDto {
   status: string;
   refCode?: string;
   assignedFunderId?: string;
+  assignedFunderUserId?: string;
   assignedFunderCompany?: string;
   createdAt: string;
   updatedAt: string;
