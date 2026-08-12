@@ -1,0 +1,189 @@
+# Database Schema
+
+## Overview
+
+MyPO uses **PostgreSQL** accessed via Entity Framework Core with Npgsql. Migrations are applied automatically on startup (`db.Database.Migrate()`).
+
+Database name: `mypo_db`
+
+---
+
+## Entity Relationship Summary
+
+```
+users (1) ──────── (1) profiles
+users (1) ──────── (N) user_roles
+users (1) ──────── (N) funding_applications
+users (1) ──────── (1) registered_funders
+registered_funders (1) ── (N) funding_applications  [assigned_funder_id]
+funding_applications (1) ─ (N) application_documents
+funding_applications (1) ─ (N) application_messages
+users (1) ──────── (N) application_messages  [sender_id]
+users (1) ──────── (N) application_messages  [receiver_id]
+```
+
+---
+
+## Tables
+
+### `users`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key, auto-generated |
+| `email` | TEXT | Unique, stored lowercase |
+| `password_hash` | TEXT | BCrypt hash |
+| `email_confirmed` | BOOL | Default `false`; set `true` immediately on registration |
+| `email_confirmation_token` | TEXT? | Nullable |
+| `password_reset_token` | TEXT? | UUID string, set on forgot-password |
+| `password_reset_expires` | TIMESTAMP? | 1-hour expiry |
+| `created_at` | TIMESTAMP | UTC |
+| `updated_at` | TIMESTAMP | UTC |
+
+---
+
+### `profiles`
+
+One-to-one with `users`. Shares the same primary key as `users.id`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK = FK → `users.id` |
+| `company_name` | TEXT? | Populated on first application |
+| `contact_name` | TEXT? | — |
+| `email` | TEXT? | — |
+| `phone` | TEXT? | — |
+| `ref_code` | TEXT? | Supplier reference code (e.g. `SUP-00001`) |
+| `created_at` | TIMESTAMP | UTC |
+| `updated_at` | TIMESTAMP | UTC |
+
+---
+
+### `user_roles`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | FK → `users.id` |
+| `role` | TEXT | `supplier`, `funder`, or `admin` |
+
+A user may hold multiple roles.
+
+---
+
+### `funding_applications`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | FK → `users.id` |
+| `company_name` | TEXT | Applicant's company |
+| `contact_name` | TEXT | — |
+| `email` | TEXT | Contact email for this application |
+| `phone` | TEXT | — |
+| `industry` | TEXT | — |
+| `po_amount` | DECIMAL | Total value of the purchase order |
+| `cost_of_delivery` | DECIMAL | Cost to fulfil the PO |
+| `amount_needed` | DECIMAL | Funding required |
+| `customer_name` | TEXT | Name of the PO customer |
+| `payment_terms` | TEXT | e.g. `30 days`, `60 days` |
+| `description` | TEXT? | Optional description |
+| `status` | TEXT | `pending` → `reviewed` → `successful` or `declined` |
+| `assigned_funder_id` | UUID? | FK → `registered_funders.id` |
+| `ref_code` | TEXT? | Auto-generated reference (e.g. `APP-00001`) |
+| `created_at` | TIMESTAMP | UTC |
+| `updated_at` | TIMESTAMP | UTC |
+
+**Status flow:**
+
+```
+pending  ──► reviewed   (funder claims for review)
+         ──► successful (funder takes it directly)
+reviewed ──► successful (funder funds after review)
+*        ──► declined   (admin override)
+```
+
+---
+
+### `application_documents`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `application_id` | UUID | FK → `funding_applications.id` |
+| `document_type` | TEXT | e.g. `purchase_order`, `invoice`, `bank_statement` |
+| `file_name` | TEXT | Original filename |
+| `file_path` | TEXT | Relative path under `uploads/` |
+| `file_size` | BIGINT | Bytes |
+| `created_at` | TIMESTAMP | UTC |
+
+---
+
+### `application_messages`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `application_id` | UUID | FK → `funding_applications.id` |
+| `sender_id` | UUID | FK → `users.id` |
+| `receiver_id` | UUID | FK → `users.id` |
+| `message_text` | TEXT | — |
+| `is_read` | BOOL | Default `false`; marked `true` when receiver loads messages |
+| `created_at` | TIMESTAMP | UTC |
+
+Messages are only allowed on applications with status `successful`.
+
+---
+
+### `registered_funders`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | FK → `users.id` |
+| `company_name` | TEXT | — |
+| `contact_name` | TEXT | — |
+| `email` | TEXT | — |
+| `phone` | TEXT | — |
+| `company_website` | TEXT? | — |
+| `years_in_business` | INT? | — |
+| `funding_capacity` | TEXT? | e.g. `R500k - R2m` |
+| `funding_description` | TEXT? | — |
+| `industries` | TEXT[] | PostgreSQL array of industry strings |
+| `min_po_amount` | DECIMAL? | Minimum PO they will fund |
+| `max_po_amount` | DECIMAL? | Maximum PO they will fund |
+| `is_active` | BOOL | Default `true`; set `false` on unsubscribe or admin deactivation |
+| `unsubscribe_token` | TEXT? | UUID string for unsubscribe link; nulled after use |
+| `ref_code` | TEXT? | Funder reference code (e.g. `FND-00001`) |
+| `created_at` | TIMESTAMP | UTC |
+
+---
+
+## Reference Codes
+
+Reference codes are auto-generated by `RefCodeService` using the following formats:
+
+| Type | Format | Example |
+|---|---|---|
+| Supplier | `SUP-NNNNN` | `SUP-00001` |
+| Funder | `FND-NNNNN` | `FND-00001` |
+| Application | `APP-NNNNN` | `APP-00042` |
+
+---
+
+## Migration Commands
+
+Run from the `MyPO.API` directory:
+
+```bash
+# Add a new migration
+dotnet ef migrations add <MigrationName>
+
+# Apply pending migrations to the database
+dotnet ef database update
+
+# Revert last migration
+dotnet ef migrations remove
+```
+
+Migrations are also applied automatically on every API startup via `db.Database.Migrate()`.

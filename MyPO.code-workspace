@@ -1,0 +1,140 @@
+{
+  "folders": [
+    {
+      "name": "MyPO Client (Angular)",
+      "path": "mypo-client"
+    },
+    {
+      "name": "MyPO API (.NET)",
+      "path": "MyPO.API"
+    },
+    {
+      "name": "PO Fund (Reference)",
+      "path": "pofund-2f49e8fb-main"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "files.autoSave": "onFocusChange",
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "explorer.confirmDelete": false,
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": "active"
+  },
+  "extensions": {
+    "recommendations": [
+      "angular.ng-template",
+      "ms-dotnettools.csharp",
+      "ms-dotnettools.csdevkit",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "ms-azuretools.vscode-docker"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Run Angular Client",
+        "type": "chrome",
+        "request": "launch",
+        "preLaunchTask": "Start Angular Client",
+        "url": "http://localhost:4200/"
+      },
+      {
+        "name": "Run .NET API",
+        "type": "coreclr",
+        "request": "launch",
+        "preLaunchTask": "build-api",
+        "program": "${workspaceFolder:MyPO API (.NET)}/bin/Debug/net8.0/MyPO.API.dll",
+        "args": [],
+        "cwd": "${workspaceFolder:MyPO API (.NET)}",
+        "stopAtEntry": false,
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      },
+      {
+        "name": "Run Full Stack",
+        "type": "chrome",
+        "request": "launch",
+        "preLaunchTask": "Start Full Stack",
+        "url": "http://localhost:4200/"
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Start Angular Client",
+        "type": "shell",
+        "command": "npm run start",
+        "options": {
+          "cwd": "${workspaceFolder:MyPO Client (Angular)}"
+        },
+        "isBackground": true,
+        "problemMatcher": {
+          "owner": "typescript",
+          "pattern": "$tsc",
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": { "regexp": "Changes detected" },
+            "endsPattern": { "regexp": "bundle generation (complete|failed)" }
+          }
+        },
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated",
+          "label": "Angular Dev Server"
+        }
+      },
+      {
+        "label": "build-api",
+        "type": "shell",
+        "command": "dotnet build",
+        "options": {
+          "cwd": "${workspaceFolder:MyPO API (.NET)}"
+        },
+        "group": "build",
+        "problemMatcher": "$msCompile",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated",
+          "label": ".NET Build"
+        }
+      },
+      {
+        "label": "Start .NET API",
+        "type": "shell",
+        "command": "dotnet run",
+        "options": {
+          "cwd": "${workspaceFolder:MyPO API (.NET)}"
+        },
+        "isBackground": true,
+        "problemMatcher": "$msCompile",
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated",
+          "label": ".NET Dev Server"
+        }
+      },
+      {
+        "label": "Start Full Stack",
+        "dependsOn": ["Start .NET API", "Start Angular Client"],
+        "dependsOrder": "parallel",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "presentation": {
+          "reveal": "always"
+        },
+        "problemMatcher": []
+      }
+    ]
+  }
+}

@@ -1,37 +1,41 @@
-# ---------------------------------------------
-# Secrets / environment-specific config
-# ---------------------------------------------
-# Contains DB credentials, JWT key, API keys and admin password.
-# Keep these OUT of source control. Use appsettings.example.json as the template.
+# ── Secrets (NEVER commit these) ──────────────────────────────────────────────
 MyPO.API/appsettings.json
 **/appsettings.*.local.json
+**/appsettings.Production.json
+**/appsettings.Staging.json
 
-# ---------------------------------------------
-# .NET build output
-# ---------------------------------------------
+# ── .NET build output ─────────────────────────────────────────────────────────
 [Bb]in/
 [Oo]bj/
-[Dd]ebug/
-[Rr]elease/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
-# Publish output
+**/bin/
+**/obj/
+**/publish/
 publish/
 [Pp]ublish/
 *.publishsettings
+*.userosscache
+*.sln.docstates
 
-# ---------------------------------------------
-# Logs
-# ---------------------------------------------
+# ── Uploaded files ────────────────────────────────────────────────────────────
+**/uploads/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
 logs/
+**/logs/
 *.log
 
-# ---------------------------------------------
-# OS / editor files
-# ---------------------------------------------
+# ── Node / Angular ────────────────────────────────────────────────────────────
+**/node_modules/
+**/dist/
+**/.angular/
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-.vs/

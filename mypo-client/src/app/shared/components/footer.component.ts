@@ -10,7 +10,7 @@ import { filter } from 'rxjs/operators';
     @if (showFooter()) {
       <footer class="site-footer">
         <div class="footer-inner">
-          <a routerLink="/" aria-label="MyPO home">
+          <a routerLink="/" aria-label="MyPO home" class="f-logo-wrap">
             <img src="assets/mypo-logo.png" alt="MyPO" class="f-logo-img" />
           </a>
           <div class="f-links">
@@ -35,7 +35,11 @@ import { filter } from 'rxjs/operators';
       display: flex; align-items: center;
       justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;
     }
-    .f-logo-img { height: 160px; width: auto; filter: brightness(0) invert(1); }
+    .f-logo-wrap {
+      background: #fff; border-radius: 12px;
+      padding: .5rem .75rem; display: inline-flex; align-items: center;
+    }
+    .f-logo-img { height: 80px; width: auto; display: block; }
     .f-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
     .f-links a {
       color: rgba(255,255,255,.6); text-decoration: none;
