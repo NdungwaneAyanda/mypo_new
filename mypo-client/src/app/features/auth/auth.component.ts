@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { LogoComponent } from '../../shared/components/logo.component';
@@ -261,7 +261,13 @@ export class AuthComponent {
   error     = signal('');
   showPw    = signal(false);
 
-  constructor(private auth: AuthService, private router: Router, private toast: ToastService) {
+  constructor(private auth: AuthService, private router: Router, private route: ActivatedRoute, private toast: ToastService) {
+    const role = this.route.snapshot.queryParamMap.get('role');
+    if (role === 'funder' || role === 'supplier') {
+      this.loginRole.set(role);
+    } else if (localStorage.getItem('mypo_login_role') === 'funder') {
+      this.loginRole.set('funder');
+    }
     if (this.auth.isLoggedIn()) this.router.navigate(['/dashboard']);
   }
 
@@ -274,26 +280,28 @@ export class AuthComponent {
     if (!email) { this.error.set('Please enter your email address.'); return; }
     this.error.set(''); this.loading.set(true);
     this.auth.login({ email, password: this.password }).subscribe({
-      next: res => {
+      next: () => {
         const user = this.auth.currentUser();
-        // Admin bypasses the role toggle — go straight to admin panel
-        if (user?.roles.includes('admin')) {
-          this.loading.set(false);
+        const roles = user?.roles ?? [];
+        this.loading.set(false);
+
+        if (roles.includes('admin')) {
           this.auth.setActiveRole('admin');
           this.toast.success('Welcome back, Admin!');
           this.router.navigate(['/admin']);
           return;
         }
-        const expectedRole = this.loginRole();
-        if (user && !user.roles.includes(expectedRole)) {
-          const actual = user.roles.includes('funder') ? 'Funder' : 'Supplier';
-          this.error.set(`This account is registered as a ${actual}. Please select the correct role above.`);
-          this.auth.logout();
-          this.loading.set(false);
-          return;
-        }
-        this.auth.setActiveRole(expectedRole);
-        this.toast.success(`Welcome back, ${expectedRole === 'funder' ? 'Funder' : 'Supplier'}!`);
+
+        const preferred = this.loginRole();
+        const role = roles.includes(preferred)
+          ? preferred
+          : roles.includes('funder')
+            ? 'funder'
+            : 'supplier';
+
+        this.auth.setActiveRole(role);
+        localStorage.setItem('mypo_login_role', role);
+        this.toast.success(`Welcome back, ${role === 'funder' ? 'Funder' : 'Supplier'}!`);
         this.router.navigate(['/dashboard']);
       },
       error: err => { this.error.set(this.apiError(err, 'Invalid email or password.')); this.loading.set(false); }

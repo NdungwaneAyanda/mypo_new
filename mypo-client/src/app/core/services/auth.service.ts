@@ -50,13 +50,13 @@ export class AuthService {
     localStorage.setItem(this.ROLE_KEY, role);
   }
 
-  logout() {
+  logout(redirectHome = true) {
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
     localStorage.removeItem(this.ROLE_KEY);
     this.currentUser.set(null);
     this.activeRole.set('');
-    this.router.navigate(['/']);
+    if (redirectHome) this.router.navigate(['/']);
   }
 
   getToken(): string | null {
@@ -77,8 +77,9 @@ export class AuthService {
 
   private handleAuth(res: AuthResponse) {
     localStorage.setItem(this.TOKEN_KEY, res.token);
-    localStorage.setItem(this.USER_KEY, JSON.stringify(res.user));
-    this.currentUser.set(res.user);
+    const user = { ...res.user, roles: res.user?.roles ?? [] };
+    localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+    this.currentUser.set(user);
   }
 
   private loadUser(): UserDto | null {

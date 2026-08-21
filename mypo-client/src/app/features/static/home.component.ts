@@ -84,6 +84,7 @@ import { CommonModule } from '@angular/common';
             <h3>Join Our Funder Network</h3>
             <p>Are you a funder or investor looking for short-term, high-yield opportunities? Register to access pre-vetted PO funding deals.</p>
             <a routerLink="/register-funder" class="btn btn-dark btn-lg">Register as Funder →</a>
+            <a routerLink="/auth" [queryParams]="{ role: 'funder' }" class="btn btn-outline btn-lg" style="margin-left:.75rem">Funder Sign In</a>
           </div>
         </div>
       </div>

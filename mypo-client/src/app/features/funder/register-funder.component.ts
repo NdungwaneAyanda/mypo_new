@@ -22,6 +22,9 @@ import { ToastService } from '../../core/services/toast.service';
           <p class="rf-switch-note">
             Looking to get funded instead?
             <a routerLink="/auth" class="rf-link">Apply as a Supplier</a>
+            &nbsp;·&nbsp;
+            Already a funder?
+            <a routerLink="/auth" [queryParams]="{ role: 'funder' }" class="rf-link">Sign in</a>
           </p>
         </div>
 
