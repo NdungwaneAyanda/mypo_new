@@ -6,7 +6,7 @@ import { ApplicationService } from '../../core/services/application.service';
 import { AuthService } from '../../core/services/auth.service';
 import { SignalRService } from '../../core/services/signalr.service';
 import { ToastService } from '../../core/services/toast.service';
-import { ApplicationDto, MessageDto } from '../../core/models/application.models';
+import { ApplicationDto, MessageDto, APPLICATION_DOC_TYPES, DocumentDto } from '../../core/models/application.models';
 
 @Component({
   selector: 'app-dashboard',
@@ -102,11 +102,12 @@ import { ApplicationDto, MessageDto } from '../../core/models/application.models
               </div>
             </div>
             <div class="app-card-actions">
-              @if (!isSupplier() && !app.assignedFunderId && isActiveFunder()) {
+              @if (!isSupplier() && !app.assignedFunderId && isActiveFunder() && app.status === 'ready_for_funding') {
                 <button class="btn btn-primary btn-sm" (click)="claim(app); $event.stopPropagation()">Claim</button>
               }
-              @if (!isSupplier() && isMyClaimedApp(app) && app.status === 'reviewed') {
-                <button class="btn btn-dark btn-sm" (click)="takeOffer(app); $event.stopPropagation()">Take Offer</button>
+              @if (!isSupplier() && isMyClaimedApp(app) && (app.status === 'reviewed' || app.status === 'ready_for_funding')) {
+                <button class="btn btn-dark btn-sm" (click)="takeOffer(app); $event.stopPropagation()"
+                  [title]="'2% platform fee: ' + formatAmount(app.estimatedPlatformFee)">Take Offer</button>
               }
               <span class="expand-arrow">{{ expandedId() === app.id ? '▲' : '▼' }}</span>
             </div>
@@ -121,28 +122,53 @@ import { ApplicationDto, MessageDto } from '../../core/models/application.models
                 <div class="detail-item"><span class="di-label">PO Amount</span><span>{{ formatAmount(app.poAmount) }}</span></div>
                 <div class="detail-item"><span class="di-label">Cost of Delivery</span><span>{{ formatAmount(app.costOfDelivery) }}</span></div>
                 <div class="detail-item"><span class="di-label">Amount Needed</span><span>{{ formatAmount(app.amountNeeded) }}</span></div>
+                @if (!isSupplier()) {
+                  <div class="detail-item">
+                    <span class="di-label">Platform fee ({{ app.platformFeePercent }}%)</span>
+                    <span>{{ formatAmount(app.platformFeeAmount ?? app.estimatedPlatformFee) }}{{ app.platformFeeAmount ? ' charged' : ' due on funding' }}</span>
+                  </div>
+                }
                 <div class="detail-item"><span class="di-label">Payment Terms</span><span>{{ app.paymentTerms ? app.paymentTerms + ' days' : '—' }}</span></div>
                 <div class="detail-item"><span class="di-label">Customer</span><span>{{ app.customerName || '—' }}</span></div>
                 @if (app.description) { <div class="detail-item full"><span class="di-label">Description</span><span>{{ app.description }}</span></div> }
               </div>
 
-              @if (app.documents && app.documents.length) {
-                <div class="docs-section">
-                  <h4>Documents ({{ app.documents!.length }})</h4>
+              <div class="docs-section">
+                  <h4>Documents ({{ uploadedCount(app) }}/{{ docSlots(app).length }})</h4>
+                  @if (isSupplier() && app.status === 'provisional') {
+                    <p class="docs-hint">Upload the Purchase Order to move this application to Ready for Funding.</p>
+                  }
                   <div class="docs-list">
-                    @for (doc of app.documents; track doc.id) {
-                      <div class="doc-row">
-                        <span class="doc-row-name"><i class="fa-solid fa-file-pdf"></i> {{ doc.documentType | titlecase }}</span>
+                    @for (slot of docSlots(app); track slot.type) {
+                      <div class="doc-row" [class.missing]="!slot.doc">
+                        <span class="doc-row-name">
+                          <i [class]="slot.doc ? 'fa-solid fa-file-pdf' : 'fa-regular fa-file'"></i>
+                          {{ slot.label }}
+                          @if (slot.required) { <span class="doc-req">Required</span> }
+                          @if (!slot.doc) { <span class="doc-missing">Outstanding</span> }
+                        </span>
                         <div class="doc-row-actions">
-                          <button class="btn btn-ghost btn-sm" (click)="downloadDoc(app.id, doc.id, doc.fileName)">Download</button>
-                          @if (isSupplier() && app.userId === auth.currentUser()?.id) {
-                            <label class="btn btn-outline btn-sm replace-btn" [class.replacing]="replacingDocId() === doc.id">
+                          @if (slot.doc) {
+                            <button class="btn btn-ghost btn-sm" (click)="downloadDoc(app.id, slot.doc.id, slot.doc.fileName)">Download</button>
+                            @if (isSupplier() && app.userId === auth.currentUser()?.id) {
+                              <label class="btn btn-outline btn-sm replace-btn" [class.replacing]="replacingDocId() === slot.doc.id">
+                                <input type="file" accept=".pdf,.doc,.docx" style="display:none"
+                                  (change)="replaceDoc($event, app.id, slot.doc.id)" />
+                                @if (replacingDocId() === slot.doc.id) {
+                                  <i class="fas fa-spinner fa-spin"></i>
+                                } @else {
+                                  <i class="fas fa-retweet"></i> Replace
+                                }
+                              </label>
+                            }
+                          } @else if (isSupplier() && app.userId === auth.currentUser()?.id) {
+                            <label class="btn btn-outline btn-sm replace-btn" [class.replacing]="uploadingDocType() === slot.type">
                               <input type="file" accept=".pdf,.doc,.docx" style="display:none"
-                                (change)="replaceDoc($event, app.id, doc.id)" />
-                              @if (replacingDocId() === doc.id) {
+                                (change)="uploadMissingDoc($event, app.id, slot.type)" />
+                              @if (uploadingDocType() === slot.type) {
                                 <i class="fas fa-spinner fa-spin"></i>
                               } @else {
-                                <i class="fas fa-retweet"></i> Replace
+                                <i class="fas fa-cloud-arrow-up"></i> Upload
                               }
                             </label>
                           }
@@ -151,7 +177,6 @@ import { ApplicationDto, MessageDto } from '../../core/models/application.models
                     }
                   </div>
                 </div>
-              }
 
               @if (canChat(app)) {
                 <div class="chat-section">
@@ -260,6 +285,14 @@ import { ApplicationDto, MessageDto } from '../../core/models/application.models
     .docs-section h4 { font-size: .875rem; font-weight: 700; color: var(--gray-700); margin-bottom: .5rem; }
     .docs-list { display: flex; flex-direction: column; gap: .375rem; }
     .doc-row { display: flex; align-items: center; justify-content: space-between; font-size: .875rem; padding: .375rem .625rem; background: var(--gray-50); border-radius: var(--radius-sm); gap: .5rem; }
+    .doc-row.missing { background: #fff7ed; }
+    .docs-hint { font-size: .8125rem; color: #c2410c; margin: 0 0 .5rem; }
+    .doc-req, .doc-missing {
+      font-size: .65rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+      padding: .1rem .4rem; border-radius: 9999px; margin-left: .4rem;
+    }
+    .doc-req { background: rgba(16,185,129,.12); color: var(--teal-dark); }
+    .doc-missing { background: #ffedd5; color: #c2410c; }
     .doc-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .doc-row-actions { display: flex; align-items: center; gap: .375rem; flex-shrink: 0; }
     .replace-btn { cursor: pointer; font-size: .75rem; padding: .25rem .6rem; border: 1.5px solid var(--gray-300); border-radius: var(--radius-sm); background: #fff; color: var(--gray-600); font-weight: 600; transition: all .2s; display: inline-flex; align-items: center; }
@@ -297,14 +330,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
   sendingMsg    = signal(false);
   currentPage   = signal(1);
   replacingDocId = signal<string|null>(null);
+  uploadingDocType = signal<string|null>(null);
   readonly PAGE_SIZE = 8;
 
   statusFilters = [
-    { value:'all',        label:'All'       },
-    { value:'pending',    label:'Pending'   },
-    { value:'reviewed',   label:'Reviewed'  },
-    { value:'successful', label:'Funded'    },
-    { value:'declined',   label:'Declined'  },
+    { value:'all',               label:'All'               },
+    { value:'provisional',       label:'Provisional'       },
+    { value:'ready_for_funding', label:'Ready for Funding' },
+    { value:'reviewed',          label:'Under Review'      },
+    { value:'funded',            label:'Funded'            },
+    { value:'declined',          label:'Declined'          },
   ];
 
   isSupplier     = computed(() => !!this.auth.currentUser()?.roles?.includes('supplier'));
@@ -332,14 +367,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const apps = this.applications();
     if (this.isSupplier()) return [
       { label:'Total Applications', value: apps.length, color: 'var(--navy)' },
-      { label:'Pending Review',     value: apps.filter(a=>a.status==='pending').length,    color:'var(--warning)' },
-      { label:'Funded',             value: apps.filter(a=>a.status==='successful').length, color:'var(--teal)'    },
-      { label:'In Review',          value: apps.filter(a=>a.status==='reviewed').length,   color:'#3b82f6'        },
+      { label:'Provisional',        value: apps.filter(a=>a.status==='provisional').length,       color:'var(--warning)' },
+      { label:'Ready for Funding',  value: apps.filter(a=>a.status==='ready_for_funding').length, color:'#3b82f6'        },
+      { label:'Funded',             value: apps.filter(a=>a.status==='funded').length,            color:'var(--teal)'    },
     ];
     return [
-      { label:'Available',  value: apps.filter(a=>!a.assignedFunderId).length, color:'var(--teal)'  },
-      { label:'Claimed',    value: apps.filter(a=>!!a.assignedFunderId).length, color:'var(--navy)'  },
-      { label:'Funded',     value: apps.filter(a=>a.status==='successful').length, color:'#3b82f6'   },
+      { label:'Available',  value: apps.filter(a=>a.status==='ready_for_funding' && !a.assignedFunderId).length, color:'var(--teal)'  },
+      { label:'Claimed',    value: apps.filter(a=>a.status==='ready_for_funding' && !!a.assignedFunderId).length, color:'var(--navy)'  },
+      { label:'Funded',     value: apps.filter(a=>a.status==='funded').length,            color:'#3b82f6'      },
       { label:'Total',      value: apps.length, color:'var(--gray-700)' },
     ];
   });
@@ -389,7 +424,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   canChat(app: ApplicationDto) {
-    return app.assignedFunderId && (this.isSupplier() ? (app.userId === this.auth.currentUser()?.id) : this.isActiveFunder());
+    return app.status === 'funded' && app.assignedFunderId && (this.isSupplier() ? (app.userId === this.auth.currentUser()?.id) : this.isActiveFunder());
   }
 
   isMyMessage(msg: MessageDto) { return msg.senderId === this.auth.currentUser()?.id; }
@@ -404,8 +439,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   takeOffer(app: ApplicationDto) {
+    const fee = app.platformFeeAmount ?? app.estimatedPlatformFee;
+    const ok = confirm(
+      `A ${app.platformFeePercent}% platform fee of ${this.formatAmount(fee)} will be charged to you on the amount needed (${this.formatAmount(app.amountNeeded)}).\n\nContinue and fund this application?`
+    );
+    if (!ok) return;
     this.appSvc.claimApplication(app.id, 'take').subscribe({
-      next: () => { this.toast.success('Offer accepted!'); this.loadApps(); },
+      next: () => { this.toast.success(`Funded. Platform fee ${this.formatAmount(fee)} recorded.`); this.loadApps(); },
       error: (err: any) => this.toast.error(err.error?.message || 'Failed.')
     });
   }
@@ -435,6 +475,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  uploadMissingDoc(event: Event, appId: string, documentType: string) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { this.toast.error('File must be under 5MB.'); return; }
+    this.uploadingDocType.set(documentType);
+    this.appSvc.uploadDocument(appId, file, documentType).subscribe({
+      next: () => {
+        this.uploadingDocType.set(null);
+        this.toast.success(documentType === 'purchase_order'
+          ? 'Purchase Order uploaded. Application is now Ready for Funding.'
+          : 'Document uploaded.');
+        this.loadApps();
+      },
+      error: (err: any) => {
+        this.uploadingDocType.set(null);
+        this.toast.error(err.error?.message || 'Upload failed.');
+      }
+    });
+  }
+
   sendMessage(app: ApplicationDto) {
     if (!this.newMessage.trim()) return;
     this.sendingMsg.set(true);
@@ -458,11 +518,37 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  statusLabel(s: string) {
-    return ({ pending:'Pending', reviewed:'Under Review', successful:'Funded', rejected:'Rejected', declined:'Declined' } as any)[s] || s;
+  docSlots(app: ApplicationDto) {
+    return APPLICATION_DOC_TYPES.map(slot => ({
+      ...slot,
+      doc: (app.documents || []).find(d => d.documentType === slot.type) as DocumentDto | undefined
+    }));
   }
 
-  statusClass(s: string) { return `badge-${s}`; }
+  uploadedCount(app: ApplicationDto) {
+    return this.docSlots(app).filter(s => !!s.doc).length;
+  }
+
+  statusLabel(s: string) {
+    return ({
+      provisional: 'Provisional',
+      ready_for_funding: 'Ready for Funding',
+      reviewed: 'Under Review',
+      funded: 'Funded',
+      pending: 'Ready for Funding',
+      successful: 'Funded',
+      rejected: 'Rejected',
+      declined: 'Declined'
+    } as Record<string, string>)[s] || s;
+  }
+
+  statusClass(s: string) {
+    const map: Record<string, string> = {
+      pending: 'badge-ready_for_funding',
+      successful: 'badge-funded'
+    };
+    return map[s] || `badge-${s}`;
+  }
   formatAmount(n: number) { return n ? `R${n.toLocaleString('en-ZA')}` : '—'; }
   formatTime(d: string) { return new Date(d).toLocaleTimeString('en-ZA', { hour:'2-digit', minute:'2-digit' }); }
 

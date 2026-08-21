@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MyPO.API.Data;
+using MyPO.API.Models;
 using MyPO.API.Models.Entities;
 using System.Security.Claims;
 
@@ -36,7 +37,7 @@ public class ChatHub : Hub
             .Include(a => a.AssignedFunder)
             .FirstOrDefaultAsync(a => a.Id == appId);
 
-        if (application == null || application.Status != "successful")
+        if (application == null || !ApplicationStatus.IsFunded(application.Status))
             return;
 
         Guid receiverId;

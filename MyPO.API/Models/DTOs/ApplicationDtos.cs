@@ -37,6 +37,9 @@ public class ApplicationResponseDto
     public Guid? AssignedFunderId { get; set; }
     public Guid? AssignedFunderUserId { get; set; }
     public string? AssignedFunderCompany { get; set; }
+    public decimal PlatformFeePercent { get; set; }
+    public decimal EstimatedPlatformFee { get; set; }
+    public decimal? PlatformFeeAmount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public List<DocumentResponseDto> Documents { get; set; } = new();

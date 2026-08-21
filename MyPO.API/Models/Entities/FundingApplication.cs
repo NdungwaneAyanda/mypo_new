@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using MyPO.API.Models;
 
 namespace MyPO.API.Models.Entities;
 
@@ -40,6 +41,12 @@ public class FundingApplication
     [Column("amount_needed")]
     public decimal AmountNeeded { get; set; }
 
+    [Column("platform_fee_percent")]
+    public decimal? PlatformFeePercent { get; set; }
+
+    [Column("platform_fee_amount")]
+    public decimal? PlatformFeeAmount { get; set; }
+
     [Column("customer_name")]
     public string CustomerName { get; set; } = string.Empty;
 
@@ -50,7 +57,7 @@ public class FundingApplication
     public string? Description { get; set; }
 
     [Column("status")]
-    public string Status { get; set; } = "pending";
+    public string Status { get; set; } = ApplicationStatus.Provisional;
 
     [Column("assigned_funder_id")]
     public Guid? AssignedFunderId { get; set; }

@@ -10,6 +10,7 @@ export interface AdminStats {
   reviewedCount: number;
   fundedCount: number;
   totalFundingRequested: number;
+  totalPlatformFees: number;
 }
 
 export interface AdminUser {
@@ -32,6 +33,7 @@ export interface AdminApplication {
   status: string;
   poAmount: number;
   amountNeeded: number;
+  platformFeeAmount: number | null;
   paymentTerms: string | null;
   assignedFunderCompany: string | null;
   documentCount: number;

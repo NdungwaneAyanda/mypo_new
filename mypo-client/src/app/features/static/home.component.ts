@@ -16,8 +16,8 @@ import { CommonModule } from '@angular/common';
           Fast &amp; Reliable PO Funding
         </div>
         <h1 class="hero-heading">
-          Turn Your Purchase Orders Into
-          <span class="hero-teal">Working Capital</span>
+          Access a Network of
+          <span class="hero-teal">Purchase Order Funders</span>
         </h1>
         <p class="hero-sub">
           Connect with verified funders ready to finance your purchase orders.

@@ -296,8 +296,16 @@ export class AuthComponent {
         this.toast.success(`Welcome back, ${expectedRole === 'funder' ? 'Funder' : 'Supplier'}!`);
         this.router.navigate(['/dashboard']);
       },
-      error: err => { this.error.set(err.error?.message || 'Invalid email or password.'); this.loading.set(false); }
+      error: err => { this.error.set(this.apiError(err, 'Invalid email or password.')); this.loading.set(false); }
     });
+  }
+
+  private apiError(err: any, fallback: string): string {
+    if (err.status === 0) return 'Cannot reach the server. Make sure the MyPO API is running.';
+    if (err.status === 429) return 'Too many attempts. Please wait a minute and try again.';
+    if (err.error?.message) return err.error.message;
+    const first = err.error?.errors && Object.values(err.error.errors).flat()[0];
+    return typeof first === 'string' ? first : fallback;
   }
 
   register() {
@@ -308,7 +316,7 @@ export class AuthComponent {
     this.loading.set(true);
     this.auth.register({ email, password: this.password }).subscribe({
       next: () => { this.auth.setActiveRole('supplier'); this.toast.success(`Account created for ${email}. Welcome to MyPO!`); this.router.navigate(['/dashboard']); },
-      error: err => { this.error.set(err.error?.message || 'Registration failed. Please try again.'); this.loading.set(false); }
+      error: err => { this.error.set(this.apiError(err, 'Registration failed. Please try again.')); this.loading.set(false); }
     });
   }
 }

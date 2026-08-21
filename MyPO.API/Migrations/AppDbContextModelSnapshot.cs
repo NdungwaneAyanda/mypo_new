@@ -172,6 +172,14 @@ namespace MyPO.API.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("po_amount");
 
+                    b.Property<decimal?>("PlatformFeeAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("platform_fee_amount");
+
+                    b.Property<decimal?>("PlatformFeePercent")
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("platform_fee_percent");
+
                     b.Property<string>("RefCode")
                         .HasColumnType("text")
                         .HasColumnName("ref_code");

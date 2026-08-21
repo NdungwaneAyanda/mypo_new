@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MyPO.API.Data;
+using MyPO.API.Models;
 using MyPO.API.Models.DTOs;
 using MyPO.API.Models.Entities;
 using System.Security.Claims;
@@ -14,11 +15,13 @@ namespace MyPO.API.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IConfiguration _config;
     private readonly ILogger<AdminController> _logger;
 
-    public AdminController(AppDbContext db, ILogger<AdminController> logger)
+    public AdminController(AppDbContext db, IConfiguration config, ILogger<AdminController> logger)
     {
         _db     = db;
+        _config = config;
         _logger = logger;
     }
 
@@ -34,10 +37,11 @@ public class AdminController : ControllerBase
             TotalUsers               = await _db.Users.CountAsync(),
             TotalApplications        = apps.Count,
             TotalFunders             = await _db.RegisteredFunders.CountAsync(),
-            PendingCount             = apps.Count(a => a.Status == "pending"),
-            ReviewedCount            = apps.Count(a => a.Status == "reviewed"),
-            FundedCount              = apps.Count(a => a.Status == "successful"),
-            TotalFundingRequested    = apps.Sum(a => a.AmountNeeded)
+            PendingCount             = apps.Count(a => ApplicationStatus.IsProvisional(a.Status) || ApplicationStatus.IsReadyForFunding(a.Status)),
+            ReviewedCount            = apps.Count(a => a.Status == ApplicationStatus.Reviewed),
+            FundedCount              = apps.Count(a => ApplicationStatus.IsFunded(a.Status)),
+            TotalFundingRequested    = apps.Sum(a => a.AmountNeeded),
+            TotalPlatformFees        = apps.Where(a => a.PlatformFeeAmount != null).Sum(a => a.PlatformFeeAmount!.Value)
         });
     }
 
@@ -129,9 +133,10 @@ public class AdminController : ControllerBase
             CompanyName           = a.CompanyName,
             Email                 = a.Email,
             Industry              = a.Industry ?? string.Empty,
-            Status                = a.Status,
+            Status                = ApplicationStatus.Normalize(a.Status),
             PoAmount              = a.PoAmount,
             AmountNeeded          = a.AmountNeeded,
+            PlatformFeeAmount     = a.PlatformFeeAmount,
             PaymentTerms          = a.PaymentTerms,
             AssignedFunderCompany = a.AssignedFunder?.CompanyName,
             DocumentCount         = a.Documents.Count,
@@ -143,23 +148,29 @@ public class AdminController : ControllerBase
     [HttpPut("applications/{id}/status")]
     public async Task<IActionResult> SetApplicationStatus(Guid id, SetStatusDto dto)
     {
-        var validStatuses = new[] { "pending", "reviewed", "successful", "declined" };
-        if (!validStatuses.Contains(dto.Status))
+        var status = ApplicationStatus.Normalize(dto.Status);
+        if (!ApplicationStatus.ValidStatuses.Contains(status))
             return BadRequest(new { message = "Invalid status value." });
 
         var app = await _db.FundingApplications.FindAsync(id);
         if (app == null) return NotFound();
 
         var prev = app.Status;
-        app.Status    = dto.Status;
+        app.Status    = status;
+        if (ApplicationStatus.IsFunded(status) && app.PlatformFeeAmount == null)
+        {
+            var percent = PlatformFee.ResolvePercent(_config);
+            app.PlatformFeePercent = percent;
+            app.PlatformFeeAmount = PlatformFee.Calculate(app.AmountNeeded, percent);
+        }
         app.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         _logger.LogInformation("Admin {Admin} changed application {RefCode} status: {Prev} → {New}",
-            adminId, app.RefCode, prev, dto.Status);
+            adminId, app.RefCode, prev, status);
 
-        return Ok(new { message = $"Status updated to '{dto.Status}'." });
+        return Ok(new { message = $"Status updated to '{status}'." });
     }
 
     [HttpDelete("applications/{id}")]

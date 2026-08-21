@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MyPO.API.Data;
 using MyPO.API.Hubs;
+using MyPO.API.Models;
 using MyPO.API.Models.DTOs;
 using MyPO.API.Models.Entities;
 using MyPO.API.Services;
@@ -22,11 +23,12 @@ public class ApplicationsController : ControllerBase
     private readonly IHubContext<NotificationHub> _notificationHub;
     private readonly IHubContext<ChatHub> _chatHub;
     private readonly IWebHostEnvironment _env;
+    private readonly IConfiguration _config;
     private readonly ILogger<ApplicationsController> _logger;
 
     public ApplicationsController(AppDbContext db, RefCodeService refCodeService,
         IEmailService emailService, IHubContext<NotificationHub> notificationHub,
-        IHubContext<ChatHub> chatHub, IWebHostEnvironment env,
+        IHubContext<ChatHub> chatHub, IWebHostEnvironment env, IConfiguration config,
         ILogger<ApplicationsController> logger)
     {
         _db = db;
@@ -35,6 +37,7 @@ public class ApplicationsController : ControllerBase
         _emailService = emailService;
         _notificationHub = notificationHub;
         _env = env;
+        _config = config;
         _logger = logger;
     }
 
@@ -55,8 +58,10 @@ public class ApplicationsController : ControllerBase
             apps = await _db.FundingApplications
                 .Include(a => a.Documents)
                 .Include(a => a.AssignedFunder)
-                .Where(a => a.Status == "pending" || a.Status == "reviewed" ||
-                            (a.Status == "successful" && a.AssignedFunderId == funder.Id))
+                .Where(a => a.Status == ApplicationStatus.ReadyForFunding || a.Status == "pending" ||
+                            a.Status == ApplicationStatus.Reviewed ||
+                            ((a.Status == ApplicationStatus.Funded || a.Status == "successful") &&
+                             a.AssignedFunderId == funder.Id))
                 .OrderByDescending(a => a.CreatedAt)
                 .ToListAsync();
         }
@@ -115,7 +120,7 @@ public class ApplicationsController : ControllerBase
             CustomerName = dto.CustomerName,
             PaymentTerms = dto.PaymentTerms,
             Description = dto.Description,
-            Status = "pending",
+            Status = ApplicationStatus.Provisional,
             RefCode = refCode
         };
 
@@ -131,17 +136,10 @@ public class ApplicationsController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
-        _logger.LogInformation("New application submitted: {RefCode} by {Email} | Company: {Company} | Amount: R{Amount:N0}",
+        _logger.LogInformation("New provisional application submitted: {RefCode} by {Email} | Company: {Company} | Amount: R{Amount:N0}",
             refCode, dto.Email, dto.CompanyName, dto.AmountNeeded);
 
         await _emailService.SendApplicationReceivedEmailAsync(dto.Email, refCode);
-        await _notificationHub.Clients.Group("funders").SendAsync("NewOpportunity", new
-        {
-            refCode,
-            companyName = dto.CompanyName,
-            amount = dto.AmountNeeded,
-            industry = dto.Industry
-        });
 
         var created = await _db.FundingApplications
             .Include(a => a.Documents)
@@ -157,7 +155,9 @@ public class ApplicationsController : ControllerBase
         var userId = GetUserId();
         var roles = GetRoles();
 
-        var app = await _db.FundingApplications.FirstOrDefaultAsync(a => a.Id == id);
+        var app = await _db.FundingApplications
+            .Include(a => a.Documents)
+            .FirstOrDefaultAsync(a => a.Id == id);
         if (app == null) return NotFound();
         if (!CanAccessApplication(app, userId, roles)) return Forbid();
 
@@ -194,6 +194,8 @@ public class ApplicationsController : ControllerBase
 
         _db.ApplicationDocuments.Add(doc);
         await _db.SaveChangesAsync();
+
+        await PromoteWhenPurchaseOrderUploadedAsync(app, documentType);
 
         return Ok(new DocumentResponseDto
         {
@@ -303,28 +305,33 @@ public class ApplicationsController : ControllerBase
 
         if (dto.Action == "take")
         {
-            // Funder can take an offer only after they have already claimed it for review
-            if (app.Status != "reviewed" || app.AssignedFunderId != funder.Id)
-                return BadRequest(new { message = "You must claim and review this application before taking the offer." });
+            var canTake = app.AssignedFunderId == funder.Id &&
+                          (ApplicationStatus.IsReadyForFunding(app.Status) || app.Status == ApplicationStatus.Reviewed);
+            if (!canTake)
+                return BadRequest(new { message = "You must claim this application before taking the offer." });
 
-            app.Status = "successful";
+            var percent = PlatformFee.ResolvePercent(_config);
+            app.Status = ApplicationStatus.Funded;
+            app.PlatformFeePercent = percent;
+            app.PlatformFeeAmount = PlatformFee.Calculate(app.AmountNeeded, percent);
             app.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
-            _logger.LogInformation("Application FUNDED: {RefCode} by funder {FunderCompany} (UserId={FunderId})",
-                app.RefCode, funder.CompanyName, userId);
+            _logger.LogInformation("Application FUNDED: {RefCode} by funder {FunderCompany} (UserId={FunderId}) | Platform fee: R{Fee:N2} ({Percent}%)",
+                app.RefCode, funder.CompanyName, userId, app.PlatformFeeAmount, percent);
             await _emailService.SendApplicationSuccessEmailAsync(app.Email, app.RefCode ?? app.Id.ToString(), funder.CompanyName);
         }
         else
         {
-            // Claim — only available on fresh pending applications
-            if (app.Status != "pending")
-                return BadRequest(new { message = "Application is not available for claiming." });
+            if (!ApplicationStatus.IsReadyForFunding(app.Status))
+                return BadRequest(new { message = "Application is not ready for funding yet. A purchase order document is required." });
 
-            app.Status = "reviewed";
+            if (app.AssignedFunderId != null)
+                return BadRequest(new { message = "This application has already been claimed." });
+
             app.AssignedFunderId = funder.Id;
             app.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
-            _logger.LogInformation("Application CLAIMED for review: {RefCode} by funder {FunderCompany}",
+            _logger.LogInformation("Application CLAIMED: {RefCode} by funder {FunderCompany}",
                 app.RefCode, funder.CompanyName);
         }
 
@@ -383,7 +390,7 @@ public class ApplicationsController : ControllerBase
             .FirstOrDefaultAsync(a => a.Id == id);
 
         if (app == null) return NotFound();
-        if (app.Status != "successful") return BadRequest(new { message = "Chat is only available for successful applications." });
+        if (!ApplicationStatus.IsFunded(app.Status)) return BadRequest(new { message = "Chat is only available for funded applications." });
         if (!CanAccessApplication(app, userId, roles)) return Forbid();
 
         Guid receiverId;
@@ -457,11 +464,14 @@ public class ApplicationsController : ControllerBase
             CustomerName = app.CustomerName,
             PaymentTerms = app.PaymentTerms,
             Description = app.Description,
-            Status = app.Status,
+            Status = ApplicationStatus.Normalize(app.Status),
             RefCode = app.RefCode,
             AssignedFunderId = app.AssignedFunderId,
             AssignedFunderUserId = app.AssignedFunder?.UserId,
             AssignedFunderCompany = app.AssignedFunder?.CompanyName,
+            PlatformFeePercent = app.PlatformFeePercent ?? PlatformFee.ResolvePercent(_config),
+            EstimatedPlatformFee = PlatformFee.Calculate(app.AmountNeeded, app.PlatformFeePercent ?? PlatformFee.ResolvePercent(_config)),
+            PlatformFeeAmount = app.PlatformFeeAmount,
             CreatedAt = app.CreatedAt,
             UpdatedAt = app.UpdatedAt,
             Documents = app.Documents.Select(d => new DocumentResponseDto
@@ -473,6 +483,26 @@ public class ApplicationsController : ControllerBase
                 CreatedAt = d.CreatedAt
             }).ToList()
         };
+    }
+
+    private async Task PromoteWhenPurchaseOrderUploadedAsync(FundingApplication app, string documentType)
+    {
+        if (!ApplicationStatus.IsPurchaseOrder(documentType)) return;
+        if (!ApplicationStatus.IsProvisional(app.Status)) return;
+
+        app.Status = ApplicationStatus.ReadyForFunding;
+        app.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Application READY FOR FUNDING: {RefCode} (purchase order uploaded)", app.RefCode);
+
+        await _notificationHub.Clients.Group("funders").SendAsync("NewOpportunity", new
+        {
+            refCode = app.RefCode,
+            companyName = app.CompanyName,
+            amount = app.AmountNeeded,
+            industry = app.Industry
+        });
     }
 
     private bool CanAccessApplication(FundingApplication app, Guid userId, List<string> roles)

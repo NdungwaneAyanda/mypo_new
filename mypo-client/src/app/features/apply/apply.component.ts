@@ -5,8 +5,9 @@ import { Router, RouterLink } from '@angular/router';
 import { ApplicationService } from '../../core/services/application.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
+import { APPLICATION_DOC_TYPES } from '../../core/models/application.models';
 
-interface DocFile { type: string; label: string; file: File | null; }
+interface DocFile { type: string; label: string; required: boolean; file: File | null; }
 
 @Component({
   selector: 'app-apply',
@@ -19,7 +20,7 @@ interface DocFile { type: string; label: string; file: File | null; }
           <div class="success-card">
             <div class="success-icon"><i class="fa-solid fa-circle-check"></i></div>
             <h2>Application Submitted!</h2>
-            <p>Your application <strong>{{ submittedRef() }}</strong> has been received.<br>We'll notify matching funders and keep you updated.</p>
+            <p>Your application <strong>{{ submittedRef() }}</strong> has been received.<br>{{ submittedNote() }}</p>
             <div class="success-actions">
               <a routerLink="/dashboard" class="btn btn-dark">View My Applications</a>
               <button class="btn btn-outline" (click)="resetForm()">Submit Another</button>
@@ -141,21 +142,21 @@ interface DocFile { type: string; label: string; file: File | null; }
             </div>
           </div>
 
-          <!-- Required Documents -->
+          <!-- Documents -->
           <div class="form-section">
             <div class="section-head">
               <span class="section-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
-              <h2>Required Documents</h2>
+              <h2>Documents</h2>
             </div>
             <div class="docs-meta">
-              <span>Upload required documents (PDF, DOC — max 5MB each)</span>
-              <span class="docs-count" [class.complete]="attachedCount() === docFiles.length">
+              <span>Only the Purchase Order is required to become Ready for Funding. You can submit now and add the rest later (PDF, DOC — max 5MB each).</span>
+              <span class="docs-count" [class.complete]="!!poFile()">
                 {{ attachedCount() }}/{{ docFiles.length }} attached
               </span>
             </div>
             <div class="docs-grid">
               @for (doc of docFiles; track doc.type) {
-                <label class="doc-box" [class.uploaded]="doc.file">
+                <label class="doc-box" [class.uploaded]="doc.file" [class.required-doc]="doc.required">
                   <input type="file" accept=".pdf,.doc,.docx" (change)="onFile($event, doc)" style="display:none" />
                   @if (doc.file) {
                     <span class="doc-uploaded-icon"><i class="fa-solid fa-circle-check"></i></span>
@@ -166,7 +167,7 @@ interface DocFile { type: string; label: string; file: File | null; }
                     <span class="doc-upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
                     <div class="doc-box-name">{{ doc.label }}</div>
                     <div class="doc-click">Click to upload</div>
-                    <span class="doc-info" title="Required document"><i class="fa-solid fa-circle-info"></i></span>
+                    <span class="doc-tag" [class.required]="doc.required">{{ doc.required ? 'Required now' : 'Submit later' }}</span>
                   }
                 </label>
               }
@@ -179,8 +180,8 @@ interface DocFile { type: string; label: string; file: File | null; }
               @if (loading()) { <span class="spinner"></span> }
               @else { Submit Application → }
             </button>
-            @if (!canSubmit() && !loading()) {
-              <p class="submit-warning">Please attach all required documents before submitting.</p>
+            @if (canSubmit() && !loading() && !poFile()) {
+              <p class="submit-hint">You can submit now. Status will be <strong>Provisional</strong> until the Purchase Order is uploaded.</p>
             }
             <p class="submit-note">By submitting, you agree to our terms and authorize us to share your information with our funder network.</p>
           </div>
@@ -236,6 +237,15 @@ interface DocFile { type: string; label: string; file: File | null; }
     .doc-file-name { font-size: .75rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
     .doc-info { position: absolute; top: .75rem; right: .75rem; color: var(--gray-400); font-size: .85rem; cursor: pointer; }
     .doc-box.uploaded .doc-info { color: var(--teal); }
+    .doc-box.required-doc { border-color: var(--teal); }
+    .doc-tag {
+      position: absolute; top: .75rem; right: .75rem;
+      font-size: .65rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      padding: .15rem .45rem; border-radius: 9999px;
+      background: #ffedd5; color: #c2410c;
+    }
+    .doc-tag.required { background: rgba(16,185,129,.12); color: var(--teal-dark); }
+    .submit-hint { color: var(--gray-500); font-size: .875rem; text-align: center; }
 
     /* submit */
     .submit-area { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1.5px solid var(--bg-2, #f1f4f7); display: flex; flex-direction: column; align-items: center; gap: .625rem; }
@@ -304,6 +314,7 @@ export class ApplyComponent {
   error      = signal('');
   submitted  = signal(false);
   submittedRef = signal('');
+  submittedNote = signal('');
 
   form = {
     companyName: '', contactName: '', email: '', phone: '',
@@ -678,14 +689,7 @@ export class ApplyComponent {
     }
   }
 
-  docFiles: DocFile[] = [
-    { type: 'purchase_order',            label: 'Purchase Order',               file: null },
-    { type: 'company_registration',      label: 'Company Registration Document', file: null },
-    { type: 'bank_confirmation',         label: 'Bank Confirmation Letter',      file: null },
-    { type: 'director_id',              label: 'Director ID',                   file: null },
-    { type: 'company_proof_of_address',  label: 'Company Proof of Address',      file: null },
-    { type: 'director_proof_of_address', label: 'Director Proof of Address',     file: null },
-  ];
+  docFiles: DocFile[] = APPLICATION_DOC_TYPES.map(d => ({ ...d, file: null }));
 
   constructor(
     private appSvc: ApplicationService, private auth: AuthService,
@@ -707,7 +711,10 @@ export class ApplyComponent {
   }
 
   attachedCount() { return this.docFiles.filter(d => d.file).length; }
-  canSubmit() { return this.docFiles.every(d => d.file !== null); }
+  poFile() { return this.docFiles.find(d => d.type === 'purchase_order')?.file ?? null; }
+  canSubmit() {
+    return !!(this.form.companyName && this.form.email && this.form.industry && this.form.paymentTerms);
+  }
 
   parseAmt(s: string) { return parseFloat(s.replace(/[^\d.]/g, '')) || 0; }
 
@@ -726,10 +733,9 @@ export class ApplyComponent {
   }
 
   submit() {
-    if (!this.form.companyName || !this.form.email || !this.form.industry || !this.form.paymentTerms) {
+    if (!this.canSubmit()) {
       this.error.set('Please fill in all required fields.'); return;
     }
-    if (!this.canSubmit()) { this.error.set('Please attach all required documents.'); return; }
 
     this.loading.set(true); this.error.set('');
     const payload = {
@@ -745,27 +751,37 @@ export class ApplyComponent {
       costOfDelivery: this.parseAmt(this.form.costStr),
       amountNeeded:   this.parseAmt(this.form.amountStr),
     };
+    const hasPo = !!this.poFile();
 
     this.appSvc.createApplication(payload).subscribe({
       next: app => {
-        let done = 0;
         const uploads = this.docFiles.filter(d => d.file);
+        if (uploads.length === 0) {
+          this.onSuccess(app.refCode || app.id, hasPo);
+          return;
+        }
+        let done = 0;
         uploads.forEach(doc => this.appSvc.uploadDocument(app.id, doc.file!, doc.type).subscribe({
-          next: () => { if (++done === uploads.length) this.onSuccess(app.refCode || app.id); },
-          error: () => { if (++done === uploads.length) this.onSuccess(app.refCode || app.id); }
+          next: () => { if (++done === uploads.length) this.onSuccess(app.refCode || app.id, hasPo); },
+          error: () => { if (++done === uploads.length) this.onSuccess(app.refCode || app.id, hasPo); }
         }));
       },
       error: err => { this.error.set(err.error?.message || 'Submission failed. Please try again.'); this.loading.set(false); }
     });
   }
 
-  onSuccess(ref: string) {
-    this.loading.set(false); this.submittedRef.set(ref); this.submitted.set(true);
+  onSuccess(ref: string, hasPo: boolean) {
+    this.loading.set(false);
+    this.submittedRef.set(ref);
+    this.submittedNote.set(hasPo
+      ? 'It is Ready for Funding. Matching funders have been notified.'
+      : 'It is Provisional until you upload the Purchase Order. You can add outstanding documents from your dashboard.');
+    this.submitted.set(true);
     this.toast.success(`Application ${ref} submitted successfully!`);
   }
 
   resetForm() {
-    this.submitted.set(false); this.error.set('');
+    this.submitted.set(false); this.error.set(''); this.submittedNote.set('');
     this.form = { companyName:'', contactName:'', email:'', phone:'', industry:'', customerName:'', paymentTerms:'', description:'', poAmountStr:'', costStr:'', amountStr:'' };
     this.docFiles.forEach(d => d.file = null);
     this.clearCustomer();

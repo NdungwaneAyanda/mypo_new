@@ -125,8 +125,10 @@ textarea.form-control{ resize: vertical; min-height: 100px; }
   text-transform: uppercase; letter-spacing: .04em;
 }
 .badge-pending   { background: #fef9c3; color: #854d0e; }
-.badge-reviewed  { background: #dbeafe; color: #1e40af; }
-.badge-successful{ background: #dcfce7; color: #15803d; }
+.badge-provisional { background: #ffedd5; color: #c2410c; }
+.badge-ready_for_funding { background: #dbeafe; color: #1e40af; }
+.badge-reviewed  { background: #e0e7ff; color: #3730a3; }
+.badge-successful, .badge-funded { background: #dcfce7; color: #15803d; }
 .badge-rejected  { background: #fee2e2; color: #b91c1c; }
 .badge-declined  { background: #fee2e2; color: #b91c1c; }
 

@@ -82,7 +82,7 @@ type Tab = 'overview' | 'users' | 'applications' | 'funders';
                   <div class="stat-icon"><i class="fas fa-clock"></i></div>
                   <div class="stat-body">
                     <div class="stat-val">{{ stats()!.pendingCount }}</div>
-                    <div class="stat-lbl">Pending</div>
+                    <div class="stat-lbl">Open</div>
                   </div>
                 </div>
                 <div class="stat-card blue">
@@ -90,6 +90,13 @@ type Tab = 'overview' | 'users' | 'applications' | 'funders';
                   <div class="stat-body">
                     <div class="stat-val">R {{ (stats()!.totalFundingRequested / 1000).toFixed(0) }}K</div>
                     <div class="stat-lbl">Total Requested</div>
+                  </div>
+                </div>
+                <div class="stat-card green">
+                  <div class="stat-icon"><i class="fas fa-percent"></i></div>
+                  <div class="stat-body">
+                    <div class="stat-val">R {{ (stats()!.totalPlatformFees / 1000).toFixed(1) }}K</div>
+                    <div class="stat-lbl">Platform fees (2%)</div>
                   </div>
                 </div>
               </div>
@@ -165,9 +172,10 @@ type Tab = 'overview' | 'users' | 'applications' | 'funders';
             <div class="filter-row">
               <select [(ngModel)]="appFilter" class="filter-select">
                 <option value="">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="successful">Successful</option>
+                <option value="provisional">Provisional</option>
+                <option value="ready_for_funding">Ready for Funding</option>
+                <option value="reviewed">Under Review</option>
+                <option value="funded">Funded</option>
                 <option value="declined">Declined</option>
               </select>
             </div>
@@ -182,6 +190,7 @@ type Tab = 'overview' | 'users' | 'applications' | 'funders';
                       <th>Company</th>
                       <th>Industry</th>
                       <th>Amount</th>
+                      <th>Fee</th>
                       <th>Status</th>
                       <th>Funder</th>
                       <th>Docs</th>
@@ -196,12 +205,14 @@ type Tab = 'overview' | 'users' | 'applications' | 'funders';
                         <td>{{ a.companyName }}</td>
                         <td class="muted">{{ a.industry }}</td>
                         <td class="mono">R {{ a.amountNeeded | number }}</td>
+                        <td class="mono">@if (a.platformFeeAmount != null) { R {{ a.platformFeeAmount | number:'1.2-2' }} } @else { — }</td>
                         <td>
                           <select class="status-select" [ngModel]="a.status"
                                   (ngModelChange)="setAppStatus(a, $event)">
-                            <option value="pending">Pending</option>
-                            <option value="reviewed">Reviewed</option>
-                            <option value="successful">Successful</option>
+                            <option value="provisional">Provisional</option>
+                            <option value="ready_for_funding">Ready for Funding</option>
+                            <option value="reviewed">Under Review</option>
+                            <option value="funded">Funded</option>
                             <option value="declined">Declined</option>
                           </select>
                         </td>

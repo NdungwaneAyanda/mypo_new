@@ -11,6 +11,7 @@ public class AdminStatsDto
     public int FundedCount       { get; set; }
     public int ReviewedCount     { get; set; }
     public decimal TotalFundingRequested { get; set; }
+    public decimal TotalPlatformFees { get; set; }
 }
 
 public class AdminUserDto
@@ -35,6 +36,7 @@ public class AdminApplicationDto
     public string   Status        { get; set; } = string.Empty;
     public decimal  PoAmount      { get; set; }
     public decimal  AmountNeeded  { get; set; }
+    public decimal? PlatformFeeAmount { get; set; }
     public string?  PaymentTerms  { get; set; }
     public string?  AssignedFunderCompany { get; set; }
     public int      DocumentCount { get; set; }

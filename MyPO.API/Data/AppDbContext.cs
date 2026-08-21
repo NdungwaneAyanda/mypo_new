@@ -57,6 +57,8 @@ public class AppDbContext : DbContext
             entity.Property(a => a.PoAmount).HasColumnType("numeric(18,2)");
             entity.Property(a => a.CostOfDelivery).HasColumnType("numeric(18,2)");
             entity.Property(a => a.AmountNeeded).HasColumnType("numeric(18,2)");
+            entity.Property(a => a.PlatformFeePercent).HasColumnType("numeric(5,2)");
+            entity.Property(a => a.PlatformFeeAmount).HasColumnType("numeric(18,2)");
             entity.HasIndex(a => a.RefCode).IsUnique();
         });
 
