@@ -42,11 +42,14 @@ public class ApplicationsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<ApplicationResponseDto>>> GetApplications()
+    public async Task<ActionResult<List<ApplicationResponseDto>>> GetApplications([FromQuery] string? asRole)
     {
         var userId = GetUserId();
         var roles = GetRoles();
-        var isFunder = roles.Contains("funder");
+        var wantsFunder = string.Equals(asRole, "funder", StringComparison.OrdinalIgnoreCase);
+        var wantsSupplier = string.Equals(asRole, "supplier", StringComparison.OrdinalIgnoreCase);
+        var isFunder = roles.Contains("funder") && !wantsSupplier;
+        if (wantsFunder) isFunder = roles.Contains("funder");
 
         List<FundingApplication> apps;
 

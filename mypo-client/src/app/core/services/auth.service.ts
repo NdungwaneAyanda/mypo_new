@@ -39,8 +39,9 @@ export class AuthService {
   refreshMe() {
     return this.http.get<UserDto>(`${environment.apiUrl}/auth/me`).pipe(
       tap(user => {
-        this.currentUser.set(user);
-        localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+        const normalized = this.normalizeUser(user);
+        this.currentUser.set(normalized);
+        localStorage.setItem(this.USER_KEY, JSON.stringify(normalized));
       })
     );
   }
@@ -67,25 +68,51 @@ export class AuthService {
     return !!this.getToken();
   }
 
+  hasRole(role: string): boolean {
+    return this.currentUser()?.roles.includes(role) ?? false;
+  }
+
   isFunder(): boolean {
-    return this.currentUser()?.roles.includes('funder') ?? false;
+    return this.hasRole('funder');
   }
 
   isSupplier(): boolean {
-    return this.currentUser()?.roles.includes('supplier') ?? false;
+    return this.hasRole('supplier');
   }
 
-  private handleAuth(res: AuthResponse) {
-    localStorage.setItem(this.TOKEN_KEY, res.token);
-    const user = { ...res.user, roles: res.user?.roles ?? [] };
+  /** Role chosen at sign-in — drives dashboard/header, not every role on the account. */
+  actingAsFunder(): boolean {
+    return this.activeRole() === 'funder';
+  }
+
+  actingAsSupplier(): boolean {
+    return this.activeRole() === 'supplier';
+  }
+
+  handleAuth(res: AuthResponse | any) {
+    const token = res?.token ?? res?.Token;
+    const user = this.normalizeUser(res?.user ?? res?.User);
+    if (token) localStorage.setItem(this.TOKEN_KEY, token);
     localStorage.setItem(this.USER_KEY, JSON.stringify(user));
     this.currentUser.set(user);
+  }
+
+  private normalizeUser(raw: any): UserDto {
+    const rolesRaw = raw?.roles ?? raw?.Roles ?? [];
+    const roles = (Array.isArray(rolesRaw) ? rolesRaw : [])
+      .map((r: string) => String(r).toLowerCase());
+    return {
+      id: raw?.id ?? raw?.Id,
+      email: raw?.email ?? raw?.Email ?? '',
+      roles,
+      profile: raw?.profile ?? raw?.Profile
+    };
   }
 
   private loadUser(): UserDto | null {
     try {
       const stored = localStorage.getItem(this.USER_KEY);
-      return stored ? JSON.parse(stored) : null;
+      return stored ? this.normalizeUser(JSON.parse(stored)) : null;
     } catch {
       return null;
     }

@@ -281,8 +281,7 @@ export class AuthComponent {
     this.error.set(''); this.loading.set(true);
     this.auth.login({ email, password: this.password }).subscribe({
       next: () => {
-        const user = this.auth.currentUser();
-        const roles = user?.roles ?? [];
+        const roles = this.auth.currentUser()?.roles ?? [];
         this.loading.set(false);
 
         if (roles.includes('admin')) {
@@ -292,16 +291,17 @@ export class AuthComponent {
           return;
         }
 
-        const preferred = this.loginRole();
-        const role = roles.includes(preferred)
-          ? preferred
-          : roles.includes('funder')
-            ? 'funder'
-            : 'supplier';
+        const expected = this.loginRole();
+        if (!roles.includes(expected)) {
+          this.auth.logout(false);
+          const actual = roles.includes('funder') ? 'Funder' : 'Supplier';
+          this.error.set(`This account is registered as a ${actual}. Please select ${actual} above.`);
+          return;
+        }
 
-        this.auth.setActiveRole(role);
-        localStorage.setItem('mypo_login_role', role);
-        this.toast.success(`Welcome back, ${role === 'funder' ? 'Funder' : 'Supplier'}!`);
+        this.auth.setActiveRole(expected);
+        localStorage.setItem('mypo_login_role', expected);
+        this.toast.success(`Welcome back, ${expected === 'funder' ? 'Funder' : 'Supplier'}!`);
         this.router.navigate(['/dashboard']);
       },
       error: err => { this.error.set(this.apiError(err, 'Invalid email or password.')); this.loading.set(false); }

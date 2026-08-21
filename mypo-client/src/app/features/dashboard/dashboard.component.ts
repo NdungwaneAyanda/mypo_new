@@ -342,8 +342,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     { value:'declined',          label:'Declined'          },
   ];
 
-  isSupplier     = computed(() => !!this.auth.currentUser()?.roles?.includes('supplier'));
-  isActiveFunder = computed(() => !!this.auth.currentUser()?.roles?.includes('funder'));
+  isSupplier     = computed(() => this.auth.actingAsSupplier());
+  isActiveFunder = computed(() => this.auth.actingAsFunder());
   userEmail        = computed(() => this.auth.currentUser()?.email ?? '');
 
   filteredApps = computed(() => {
@@ -388,7 +388,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadApps() {
     this.loading.set(true);
-    this.appSvc.getApplications().subscribe({
+    this.appSvc.getApplications(this.auth.activeRole()).subscribe({
       next: apps => { this.applications.set(apps); this.loading.set(false); },
       error: ()  => { this.loading.set(false); this.toast.error('Failed to load applications.'); }
     });

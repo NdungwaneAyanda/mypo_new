@@ -9,8 +9,9 @@ export class ApplicationService {
 
   constructor(private http: HttpClient) {}
 
-  getApplications() {
-    return this.http.get<ApplicationDto[]>(this.base);
+  getApplications(asRole?: string) {
+    const options = asRole ? { params: { asRole } } : {};
+    return this.http.get<ApplicationDto[]>(this.base, options);
   }
 
   getApplication(id: string) {

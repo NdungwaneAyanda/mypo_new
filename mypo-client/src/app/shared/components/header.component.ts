@@ -21,11 +21,13 @@ import { filter } from 'rxjs/operators';
           <!-- Nav -->
           <nav class="h-nav">
             <a href="#how-it-works" (click)="scrollTo($event, 'how-it-works')" class="h-link">How It Works</a>
-            <a routerLink="/apply" routerLinkActive="active" class="h-link">Apply for Funding</a>
-            @if (auth.isLoggedIn()) {
-              <a routerLink="/dashboard" routerLinkActive="active" class="h-link">My Applications</a>
+            @if (!auth.actingAsFunder()) {
+              <a routerLink="/apply" routerLinkActive="active" class="h-link">Apply for Funding</a>
             }
-            @if (!isFunder()) {
+            @if (auth.isLoggedIn()) {
+              <a routerLink="/dashboard" routerLinkActive="active" class="h-link">{{ auth.actingAsFunder() ? 'Opportunities' : 'My Applications' }}</a>
+            }
+            @if (!auth.actingAsFunder()) {
               <a routerLink="/register-funder" routerLinkActive="active" class="h-link">For Funders</a>
             }
           </nav>
@@ -41,7 +43,7 @@ import { filter } from 'rxjs/operators';
                   <div class="dropdown">
                     <a routerLink="/profile"   class="dd-item" (click)="dropOpen.set(false)"><i class="fas fa-user"></i> My Profile</a>
                     <a routerLink="/dashboard" class="dd-item" (click)="dropOpen.set(false)"><i class="fas fa-th-large"></i> Dashboard</a>
-                    @if (isSupplier()) {
+                    @if (auth.actingAsSupplier()) {
                       <a routerLink="/apply" class="dd-item" (click)="dropOpen.set(false)"><i class="fas fa-file-alt"></i> Apply</a>
                     }
                     @if (isAdmin()) {
@@ -180,8 +182,6 @@ export class HeaderComponent {
 
   userInitial() { return (this.auth.currentUser()?.email?.[0] || 'U').toUpperCase(); }
   shortEmail()  { return this.auth.currentUser()?.email?.split('@')[0] || ''; }
-  isSupplier()  { return this.auth.currentUser()?.roles?.includes('supplier'); }
-  isFunder()    { return this.auth.currentUser()?.roles?.includes('funder'); }
   isAdmin()     { return this.auth.currentUser()?.roles?.includes('admin'); }
   logout()      { this.dropOpen.set(false); this.auth.logout(); }
 }

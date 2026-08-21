@@ -273,10 +273,7 @@ export class RegisterFunderComponent {
     this.loading.set(true);
     this.funderSvc.signupFunder(this.form).subscribe({
       next: res => {
-        // Store the token and user from the response
-        localStorage.setItem('mypo_token', res.token);
-        localStorage.setItem('mypo_user', JSON.stringify(res.user));
-        this.auth.currentUser.set(res.user);
+        this.auth.handleAuth(res);
         this.auth.setActiveRole('funder');
         this.registered.set(true);
         this.loading.set(false);
