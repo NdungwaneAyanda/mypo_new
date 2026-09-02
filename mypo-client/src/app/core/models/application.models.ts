@@ -22,6 +22,7 @@ export interface DocumentDto {
 
 export const APPLICATION_DOC_TYPES: { type: string; label: string; required: boolean }[] = [
   { type: 'purchase_order',            label: 'Purchase Order',                required: true  },
+  { type: 'quote_submitted',           label: 'Quote Submitted',               required: false },
   { type: 'company_registration',      label: 'Company Registration Document', required: false },
   { type: 'bank_confirmation',         label: 'Bank Confirmation Letter',      required: false },
   { type: 'director_id',               label: 'Director ID',                   required: false },
