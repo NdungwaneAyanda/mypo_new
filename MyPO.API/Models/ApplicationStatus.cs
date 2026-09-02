@@ -8,8 +8,6 @@ public static class ApplicationStatus
     public const string Funded = "funded";
     public const string Declined = "declined";
 
-    public const string PurchaseOrderType = "purchase_order";
-
     public static readonly string[] ValidStatuses =
     [
         Provisional,
@@ -25,9 +23,6 @@ public static class ApplicationStatus
         "successful" => Funded,
         _ => status
     };
-
-    public static bool IsPurchaseOrder(string documentType) =>
-        string.Equals(documentType, PurchaseOrderType, StringComparison.OrdinalIgnoreCase);
 
     public static bool IsProvisional(string status) =>
         Normalize(status) == Provisional;

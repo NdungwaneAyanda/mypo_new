@@ -6,7 +6,7 @@ import { ApplicationService } from '../../core/services/application.service';
 import { AuthService } from '../../core/services/auth.service';
 import { SignalRService } from '../../core/services/signalr.service';
 import { ToastService } from '../../core/services/toast.service';
-import { ApplicationDto, MessageDto, APPLICATION_DOC_TYPES, DocumentDto } from '../../core/models/application.models';
+import { ApplicationDto, MessageDto, APPLICATION_DOC_TYPES, DocumentDto, documentMatchesSlot } from '../../core/models/application.models';
 
 @Component({
   selector: 'app-dashboard',
@@ -136,7 +136,7 @@ import { ApplicationDto, MessageDto, APPLICATION_DOC_TYPES, DocumentDto } from '
               <div class="docs-section">
                   <h4>Documents ({{ uploadedCount(app) }}/{{ docSlots(app).length }})</h4>
                   @if (isSupplier() && app.status === 'provisional') {
-                    <p class="docs-hint">Upload the Purchase Order to move this application to Ready for Funding.</p>
+                    <p class="docs-hint">Upload Submitted Quote, Supplier Quote, and CIPC Document to move this application to Ready for Funding.</p>
                   }
                   <div class="docs-list">
                     @for (slot of docSlots(app); track slot.type) {
@@ -483,9 +483,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.appSvc.uploadDocument(appId, file, documentType).subscribe({
       next: () => {
         this.uploadingDocType.set(null);
-        this.toast.success(documentType === 'purchase_order'
-          ? 'Purchase Order uploaded. Application is now Ready for Funding.'
-          : 'Document uploaded.');
+        this.toast.success('Document uploaded.');
         this.loadApps();
       },
       error: (err: any) => {
@@ -521,7 +519,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   docSlots(app: ApplicationDto) {
     return APPLICATION_DOC_TYPES.map(slot => ({
       ...slot,
-      doc: (app.documents || []).find(d => d.documentType === slot.type) as DocumentDto | undefined
+      doc: (app.documents || []).find(d => documentMatchesSlot(d.documentType, slot.type)) as DocumentDto | undefined
     }));
   }
 

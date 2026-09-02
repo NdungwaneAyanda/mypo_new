@@ -5,7 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ApplicationService } from '../../core/services/application.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
-import { APPLICATION_DOC_TYPES } from '../../core/models/application.models';
+import { APPLICATION_DOC_TYPES, REQUIRED_DOC_TYPES } from '../../core/models/application.models';
 
 interface DocFile { type: string; label: string; required: boolean; file: File | null; }
 
@@ -149,8 +149,8 @@ interface DocFile { type: string; label: string; required: boolean; file: File |
               <h2>Documents</h2>
             </div>
             <div class="docs-meta">
-              <span>Only the Purchase Order is required to become Ready for Funding. You can submit now and add the rest later (PDF, DOC — max 5MB each).</span>
-              <span class="docs-count" [class.complete]="!!poFile()">
+              <span>Submitted Quote, Supplier Quote, and CIPC Document are required to become Ready for Funding. You can submit now and add the rest later (PDF, DOC — max 5MB each).</span>
+              <span class="docs-count" [class.complete]="hasRequiredFiles()">
                 {{ attachedCount() }}/{{ docFiles.length }} attached
               </span>
             </div>
@@ -180,8 +180,8 @@ interface DocFile { type: string; label: string; required: boolean; file: File |
               @if (loading()) { <span class="spinner"></span> }
               @else { Submit Application → }
             </button>
-            @if (canSubmit() && !loading() && !poFile()) {
-              <p class="submit-hint">You can submit now. Status will be <strong>Provisional</strong> until the Purchase Order is uploaded.</p>
+            @if (canSubmit() && !loading() && !hasRequiredFiles()) {
+              <p class="submit-hint">You can submit now. Status will be <strong>Provisional</strong> until Submitted Quote, Supplier Quote, and CIPC Document are uploaded.</p>
             }
             <p class="submit-note">By submitting, you agree to our terms and authorize us to share your information with our funder network.</p>
           </div>
@@ -711,7 +711,9 @@ export class ApplyComponent {
   }
 
   attachedCount() { return this.docFiles.filter(d => d.file).length; }
-  poFile() { return this.docFiles.find(d => d.type === 'purchase_order')?.file ?? null; }
+  hasRequiredFiles() {
+    return REQUIRED_DOC_TYPES.every(type => this.docFiles.some(d => d.type === type && d.file));
+  }
   canSubmit() {
     return !!(this.form.companyName && this.form.email && this.form.industry && this.form.paymentTerms);
   }
@@ -751,31 +753,31 @@ export class ApplyComponent {
       costOfDelivery: this.parseAmt(this.form.costStr),
       amountNeeded:   this.parseAmt(this.form.amountStr),
     };
-    const hasPo = !!this.poFile();
+    const hasRequired = this.hasRequiredFiles();
 
     this.appSvc.createApplication(payload).subscribe({
       next: app => {
         const uploads = this.docFiles.filter(d => d.file);
         if (uploads.length === 0) {
-          this.onSuccess(app.refCode || app.id, hasPo);
+          this.onSuccess(app.refCode || app.id, hasRequired);
           return;
         }
         let done = 0;
         uploads.forEach(doc => this.appSvc.uploadDocument(app.id, doc.file!, doc.type).subscribe({
-          next: () => { if (++done === uploads.length) this.onSuccess(app.refCode || app.id, hasPo); },
-          error: () => { if (++done === uploads.length) this.onSuccess(app.refCode || app.id, hasPo); }
+          next: () => { if (++done === uploads.length) this.onSuccess(app.refCode || app.id, hasRequired); },
+          error: () => { if (++done === uploads.length) this.onSuccess(app.refCode || app.id, hasRequired); }
         }));
       },
       error: err => { this.error.set(err.error?.message || 'Submission failed. Please try again.'); this.loading.set(false); }
     });
   }
 
-  onSuccess(ref: string, hasPo: boolean) {
+  onSuccess(ref: string, hasRequired: boolean) {
     this.loading.set(false);
     this.submittedRef.set(ref);
-    this.submittedNote.set(hasPo
+    this.submittedNote.set(hasRequired
       ? 'It is Ready for Funding. Matching funders have been notified.'
-      : 'It is Provisional until you upload the Purchase Order. You can add outstanding documents from your dashboard.');
+      : 'It is Provisional until Submitted Quote, Supplier Quote, and CIPC Document are uploaded. You can add outstanding documents from your dashboard.');
     this.submitted.set(true);
     this.toast.success(`Application ${ref} submitted successfully!`);
   }

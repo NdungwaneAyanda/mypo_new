@@ -198,7 +198,7 @@ public class ApplicationsController : ControllerBase
         _db.ApplicationDocuments.Add(doc);
         await _db.SaveChangesAsync();
 
-        await PromoteWhenPurchaseOrderUploadedAsync(app, documentType);
+        await PromoteIfRequiredDocumentsCompleteAsync(app);
 
         return Ok(new DocumentResponseDto
         {
@@ -488,16 +488,22 @@ public class ApplicationsController : ControllerBase
         };
     }
 
-    private async Task PromoteWhenPurchaseOrderUploadedAsync(FundingApplication app, string documentType)
+    private async Task PromoteIfRequiredDocumentsCompleteAsync(FundingApplication app)
     {
-        if (!ApplicationStatus.IsPurchaseOrder(documentType)) return;
         if (!ApplicationStatus.IsProvisional(app.Status)) return;
+
+        var types = await _db.ApplicationDocuments
+            .Where(d => d.ApplicationId == app.Id)
+            .Select(d => d.DocumentType)
+            .ToListAsync();
+
+        if (!ApplicationDocumentTypes.HasAllRequired(types)) return;
 
         app.Status = ApplicationStatus.ReadyForFunding;
         app.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Application READY FOR FUNDING: {RefCode} (purchase order uploaded)", app.RefCode);
+        _logger.LogInformation("Application READY FOR FUNDING: {RefCode} (required documents uploaded)", app.RefCode);
 
         await _notificationHub.Clients.Group("funders").SendAsync("NewOpportunity", new
         {

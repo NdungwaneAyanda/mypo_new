@@ -21,14 +21,23 @@ export interface DocumentDto {
 }
 
 export const APPLICATION_DOC_TYPES: { type: string; label: string; required: boolean }[] = [
-  { type: 'purchase_order',            label: 'Purchase Order',                required: true  },
-  { type: 'quote_submitted',           label: 'Quote Submitted',               required: false },
-  { type: 'company_registration',      label: 'Company Registration Document', required: false },
-  { type: 'bank_confirmation',         label: 'Bank Confirmation Letter',      required: false },
-  { type: 'director_id',               label: 'Director ID',                   required: false },
-  { type: 'company_proof_of_address',  label: 'Company Proof of Address',      required: false },
-  { type: 'director_proof_of_address', label: 'Director Proof of Address',     required: false },
+  { type: 'quote_submitted',      label: 'Submitted Quote',                    required: true  },
+  { type: 'supplier_quote',       label: 'Supplier Quote',                    required: true  },
+  { type: 'company_registration',  label: 'CIPC Document',                      required: true  },
+  { type: 'director_id',         label: 'Identity Document of a Director',    required: false },
+  { type: 'purchase_order',        label: 'Purchase Order Document',            required: false },
+  { type: 'proof_of_address',     label: 'Proof of Address',                    required: false },
 ];
+
+export const REQUIRED_DOC_TYPES = APPLICATION_DOC_TYPES.filter(d => d.required).map(d => d.type);
+
+const PROOF_OF_ADDRESS_ALIASES = ['proof_of_address', 'company_proof_of_address', 'director_proof_of_address'];
+
+export function documentMatchesSlot(documentType: string, slotType: string): boolean {
+  if (documentType === slotType) return true;
+  if (slotType === 'proof_of_address') return PROOF_OF_ADDRESS_ALIASES.includes(documentType);
+  return false;
+}
 
 export interface ApplicationDto {
   id: string;
