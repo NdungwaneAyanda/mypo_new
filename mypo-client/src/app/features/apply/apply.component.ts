@@ -149,7 +149,7 @@ interface DocFile { type: string; label: string; required: boolean; file: File |
               <h2>Documents</h2>
             </div>
             <div class="docs-meta">
-              <span>Submitted Quote and CIPC Document are required to become Ready for Funding. You can submit now and add the rest later (PDF, DOC — max 5MB each).</span>
+              <span>Submitted Quote, Supplier Quote, and CIPC Document are required to become Ready for Funding. You can submit now and add the rest later (PDF, DOC — max 5MB each).</span>
               <span class="docs-count" [class.complete]="hasRequiredFiles()">
                 {{ attachedCount() }}/{{ docFiles.length }} attached
               </span>
@@ -181,7 +181,7 @@ interface DocFile { type: string; label: string; required: boolean; file: File |
               @else { Submit Application → }
             </button>
             @if (canSubmit() && !loading() && !hasRequiredFiles()) {
-              <p class="submit-hint">You can submit now. Status will be <strong>Provisional</strong> until Submitted Quote and CIPC Document are uploaded.</p>
+              <p class="submit-hint">You can submit now. Status will be <strong>Provisional</strong> until Submitted Quote, Supplier Quote, and CIPC Document are uploaded.</p>
             }
             <p class="submit-note">By submitting, you agree to our terms and authorize us to share your information with our funder network.</p>
           </div>
@@ -777,7 +777,7 @@ export class ApplyComponent {
     this.submittedRef.set(ref);
     this.submittedNote.set(hasRequired
       ? 'It is Ready for Funding. Matching funders have been notified.'
-      : 'It is Provisional until Submitted Quote and CIPC Document are uploaded. You can add outstanding documents from your dashboard.');
+      : 'It is Provisional until Submitted Quote, Supplier Quote, and CIPC Document are uploaded. You can add outstanding documents from your dashboard.');
     this.submitted.set(true);
     this.toast.success(`Application ${ref} submitted successfully!`);
   }

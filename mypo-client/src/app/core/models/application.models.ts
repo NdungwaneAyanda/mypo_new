@@ -22,6 +22,7 @@ export interface DocumentDto {
 
 export const APPLICATION_DOC_TYPES: { type: string; label: string; required: boolean }[] = [
   { type: 'quote_submitted',      label: 'Submitted Quote',                    required: true  },
+  { type: 'supplier_quote',       label: 'Supplier Quote',                    required: true  },
   { type: 'company_registration',  label: 'CIPC Document',                      required: true  },
   { type: 'director_id',         label: 'Identity Document of a Director',    required: false },
   { type: 'purchase_order',        label: 'Purchase Order Document',            required: false },
