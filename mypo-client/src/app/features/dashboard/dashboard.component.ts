@@ -136,7 +136,7 @@ import { ApplicationDto, MessageDto, APPLICATION_DOC_TYPES, DocumentDto, documen
               <div class="docs-section">
                   <h4>Documents ({{ uploadedCount(app) }}/{{ docSlots(app).length }})</h4>
                   @if (isSupplier() && app.status === 'provisional') {
-                    <p class="docs-hint">Upload Submitted Quote, Supplier Quote, and CIPC Document to move this application to Ready for Funding.</p>
+                    <p class="docs-hint">Upload Submitted Quote and CIPC Document to move this application to Ready for Funding.</p>
                   }
                   <div class="docs-list">
                     @for (slot of docSlots(app); track slot.type) {
